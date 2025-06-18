@@ -4,8 +4,8 @@
 //! and react to events in the Nix ecosystem.
 
 use crate::{
-    commands::*,
-    events::*,
+    commands::{CreateFlake, UpdateFlake, AddFlakeInput, CheckFlake, DevelopFlake, BuildPackage, EvaluateExpression, RunGarbageCollection, NixCommand, CreateModule, CreateOverlay, CreateConfiguration, ActivateConfiguration},
+    events::{NixDomainEvent, FlakeCreated, FlakeUpdated, FlakeInputAdded, PackageBuilt, ExpressionEvaluated, GarbageCollected, ModuleCreated, OverlayCreated, ConfigurationCreated, ConfigurationActivated},
     templates::FlakeTemplate,
     NixDomainError, Result,
 };
@@ -18,9 +18,15 @@ use chrono::Utc;
 /// Handler for flake-related commands
 pub struct FlakeCommandHandler;
 
+impl Default for FlakeCommandHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FlakeCommandHandler {
     /// Create a new flake command handler
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self
     }
 
@@ -73,16 +79,16 @@ impl FlakeCommandHandler {
                 .arg("init")
                 .current_dir(&cmd.path)
                 .output()
-                .map_err(|e| NixDomainError::CommandError(format!("Failed to init git: {}", e)))?;
+                .map_err(|e| NixDomainError::CommandError(format!("Failed to init git: {e}")))?;
         }
 
         // Run nix flake init if template was not provided
         if cmd.template.is_none() {
             Command::new("nix")
-                .args(&["flake", "init"])
+                .args(["flake", "init"])
                 .current_dir(&cmd.path)
                 .output()
-                .map_err(|e| NixDomainError::CommandError(format!("Failed to init flake: {}", e)))?;
+                .map_err(|e| NixDomainError::CommandError(format!("Failed to init flake: {e}")))?;
         }
 
         let event = FlakeCreated {
@@ -100,10 +106,10 @@ impl FlakeCommandHandler {
     async fn update_flake(&self, cmd: UpdateFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         // Run nix flake update
         let output = Command::new("nix")
-            .args(&["flake", "update"])
+            .args(["flake", "update"])
             .current_dir(&cmd.path)
             .output()
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to update flake: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to update flake: {e}")))?;
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
@@ -136,7 +142,7 @@ impl FlakeCommandHandler {
         } else {
             // Create inputs section
             content.replace(
-                "{",
+                '{',
                 &format!("{{\n  inputs = {{\n    {} = \"{}\";\n  }};\n", cmd.name, cmd.url)
             )
         };
@@ -158,10 +164,10 @@ impl FlakeCommandHandler {
     /// Handle check flake command
     async fn check_flake(&self, cmd: CheckFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let output = Command::new("nix")
-            .args(&["flake", "check"])
+            .args(["flake", "check"])
             .current_dir(&cmd.path)
             .output()
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to check flake: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to check flake: {e}")))?;
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
@@ -186,7 +192,7 @@ impl FlakeCommandHandler {
             .args(&args)
             .current_dir(&cmd.path)
             .output()
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to enter dev shell: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to enter dev shell: {e}")))?;
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
@@ -202,9 +208,15 @@ impl FlakeCommandHandler {
 /// Handler for package build commands
 pub struct PackageCommandHandler;
 
+impl Default for PackageCommandHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PackageCommandHandler {
     /// Create a new package command handler
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self
     }
 
@@ -229,7 +241,7 @@ impl PackageCommandHandler {
         let output = Command::new("nix")
             .args(&args)
             .output()
-            .map_err(|e| NixDomainError::BuildError(format!("Failed to run nix build: {}", e)))?;
+            .map_err(|e| NixDomainError::BuildError(format!("Failed to run nix build: {e}")))?;
 
         if !output.status.success() {
             return Err(NixDomainError::BuildError(
@@ -258,18 +270,24 @@ impl PackageCommandHandler {
 /// Handler for expression evaluation
 pub struct ExpressionCommandHandler;
 
+impl Default for ExpressionCommandHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExpressionCommandHandler {
     /// Create a new expression command handler
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self
     }
 
     /// Handle evaluate expression command
     async fn evaluate_expression(&self, cmd: EvaluateExpression) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let output = Command::new("nix")
-            .args(&["eval", "--expr", &cmd.expression])
+            .args(["eval", "--expr", &cmd.expression])
             .output()
-            .map_err(|e| NixDomainError::ExecutionError(format!("Failed to evaluate expression: {}", e)))?;
+            .map_err(|e| NixDomainError::ExecutionError(format!("Failed to evaluate expression: {e}")))?;
 
         if !output.status.success() {
             return Err(NixDomainError::ExecutionError(
@@ -293,9 +311,15 @@ impl ExpressionCommandHandler {
 /// Handler for garbage collection
 pub struct GarbageCollectionHandler;
 
+impl Default for GarbageCollectionHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GarbageCollectionHandler {
     /// Create a new garbage collection handler
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self
     }
 
@@ -306,7 +330,7 @@ impl GarbageCollectionHandler {
         // Add older-than flag if specified
         let days_str;
         if let Some(days) = cmd.older_than_days {
-            days_str = format!("{}d", days);
+            days_str = format!("{days}d");
             args.push("--min-free");
             args.push(&days_str);
         }
@@ -314,7 +338,7 @@ impl GarbageCollectionHandler {
         let output = Command::new("nix")
             .args(&args)
             .output()
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to run garbage collection: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to run garbage collection: {e}")))?;
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
@@ -349,9 +373,15 @@ pub struct NixCommandHandler {
     gc_handler: GarbageCollectionHandler,
 }
 
+impl Default for NixCommandHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NixCommandHandler {
     /// Create a new Nix command handler
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             flake_handler: FlakeCommandHandler::new(),
             package_handler: PackageCommandHandler::new(),

@@ -1,6 +1,6 @@
 //! Commands for Nix domain operations
 
-use crate::value_objects::*;
+use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration};
 use crate::events::ActivationType;
 use std::path::PathBuf;
 use uuid::Uuid;

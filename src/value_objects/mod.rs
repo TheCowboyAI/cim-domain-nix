@@ -42,7 +42,7 @@ impl FlakeRef {
     }
 
     /// Convert to a Nix flake reference string
-    pub fn to_nix_string(&self) -> String {
+    #[must_use] pub fn to_nix_string(&self) -> String {
         let mut result = self.uri.clone();
         
         if let Some(rev) = &self.revision {
@@ -68,7 +68,7 @@ pub struct AttributePath {
 
 impl AttributePath {
     /// Create a new attribute path from segments
-    pub fn new(segments: Vec<String>) -> Self {
+    #[must_use] pub fn new(segments: Vec<String>) -> Self {
         Self { segments }
     }
 
@@ -80,7 +80,7 @@ impl AttributePath {
     }
 
     /// Convert to a dot-separated string
-    pub fn to_string(&self) -> String {
+    #[must_use] pub fn to_string(&self) -> String {
         self.segments.join(".")
     }
 }
@@ -108,7 +108,7 @@ pub struct Derivation {
     pub env: HashMap<String, String>,
 }
 
-/// A NixOS module
+/// A `NixOS` module
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixModule {
     /// Module ID
@@ -136,7 +136,7 @@ pub struct Overlay {
     pub additions: HashMap<String, serde_json::Value>,
 }
 
-/// A NixOS system configuration
+/// A `NixOS` system configuration
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixOSConfiguration {
     /// Configuration ID
@@ -197,7 +197,7 @@ impl StorePath {
     }
 
     /// Convert back to a string
-    pub fn to_string(&self) -> String {
+    #[must_use] pub fn to_string(&self) -> String {
         format!("/nix/store/{}-{}", self.hash, self.name)
     }
 }
@@ -222,7 +222,7 @@ pub struct FlakeOutputs {
     pub packages: HashMap<String, HashMap<String, AttributePath>>,
     /// Development shells by system and name
     pub dev_shells: HashMap<String, HashMap<String, AttributePath>>,
-    /// NixOS modules
+    /// `NixOS` modules
     pub nixos_modules: HashMap<String, AttributePath>,
     /// Overlays
     pub overlays: HashMap<String, AttributePath>,

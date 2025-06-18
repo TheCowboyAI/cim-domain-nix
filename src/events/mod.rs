@@ -3,7 +3,7 @@
 //! This module contains events that represent state changes
 //! in the Nix ecosystem.
 
-use crate::value_objects::*;
+use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration, StorePath};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -213,7 +213,7 @@ impl NixDomainEvent for OverlayCreated {
     }
 }
 
-/// Event emitted when a NixOS configuration is created
+/// Event emitted when a `NixOS` configuration is created
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigurationCreated {
     /// Event ID

@@ -1,16 +1,16 @@
 //! High-level services for Nix domain operations
 
 use crate::{
-    commands::*,
-    events::*,
-    handlers::*,
+    commands::{CreateFlake, NixCommand, AddFlakeInput, CheckFlake, BuildPackage, DevelopFlake, CreateConfiguration, ActivateConfiguration, RunGarbageCollection},
+    events::{NixDomainEvent, FlakeCreated, PackageBuilt, ActivationType, ConfigurationActivated, GarbageCollected},
+    handlers::NixCommandHandler,
     projections::NixProjection,
     queries::{
         NixQueryHandler, AdvancedNixQueryHandler,
         FindFlakeQuery, FindPackageQuery, FindConfigurationQuery, SearchNixPackagesQuery,
         FlakeView, PackageView, ConfigurationView, PackageSearchResult,
     },
-    value_objects::*,
+    value_objects::{AttributePath, NixOSConfiguration},
     Result, NixDomainError,
 };
 use std::path::PathBuf;
@@ -24,7 +24,7 @@ pub struct NixDevelopmentService {
 
 impl NixDevelopmentService {
     /// Create a new development service
-    pub fn new(projection: NixProjection) -> Self {
+    #[must_use] pub fn new(projection: NixProjection) -> Self {
         Self {
             command_handler: NixCommandHandler::new(),
             query_handler: NixQueryHandler::new(projection),
@@ -52,11 +52,7 @@ impl NixDevelopmentService {
         // Extract flake ID from events
         let flake_id = events.iter()
             .find_map(|e| {
-                if let Some(created) = e.as_any().downcast_ref::<FlakeCreated>() {
-                    Some(created.flake_id)
-                } else {
-                    None
-                }
+                e.as_any().downcast_ref::<FlakeCreated>().map(|created| created.flake_id)
             })
             .ok_or_else(|| NixDomainError::Other("No FlakeCreated event found".to_string()))?;
 
@@ -156,22 +152,22 @@ impl NixDevelopmentService {
                 .current_dir(path)
                 .output()
                 .await
-                .map_err(|e| NixDomainError::CommandError(format!("Failed to init git: {}", e)))?;
+                .map_err(|e| NixDomainError::CommandError(format!("Failed to init git: {e}")))?;
 
             // Add flake.nix to git
             Command::new("git")
-                .args(&["add", "flake.nix", "flake.lock"])
+                .args(["add", "flake.nix", "flake.lock"])
                 .current_dir(path)
                 .output()
                 .await
-                .map_err(|e| NixDomainError::CommandError(format!("Failed to add files: {}", e)))?;
+                .map_err(|e| NixDomainError::CommandError(format!("Failed to add files: {e}")))?;
         }
 
         Ok(())
     }
 }
 
-/// Service for managing NixOS configurations
+/// Service for managing `NixOS` configurations
 pub struct NixOSConfigurationService {
     command_handler: NixCommandHandler,
     query_handler: NixQueryHandler,
@@ -179,14 +175,14 @@ pub struct NixOSConfigurationService {
 
 impl NixOSConfigurationService {
     /// Create a new configuration service
-    pub fn new(projection: NixProjection) -> Self {
+    #[must_use] pub fn new(projection: NixProjection) -> Self {
         Self {
             command_handler: NixCommandHandler::new(),
             query_handler: NixQueryHandler::new(projection),
         }
     }
 
-    /// Create a new NixOS configuration
+    /// Create a new `NixOS` configuration
     pub async fn create_configuration(
         &self,
         name: String,
@@ -197,7 +193,7 @@ impl NixOSConfigurationService {
             id: Uuid::new_v4(),
             name: name.clone(),
             system,
-            path: PathBuf::from(format!("/etc/nixos/{}", name)),
+            path: PathBuf::from(format!("/etc/nixos/{name}")),
             hostname: name.clone(), // Use name as hostname by default
             modules,
             overlays: vec![],
@@ -231,11 +227,7 @@ impl NixOSConfigurationService {
         // Extract generation number
         let generation = events.iter()
             .find_map(|e| {
-                if let Some(activated) = e.as_any().downcast_ref::<ConfigurationActivated>() {
-                    Some(activated.generation)
-                } else {
-                    None
-                }
+                e.as_any().downcast_ref::<ConfigurationActivated>().map(|activated| activated.generation)
             })
             .unwrap_or(0);
 
@@ -270,7 +262,7 @@ pub struct NixPackageService {
 
 impl NixPackageService {
     /// Create a new package service
-    pub fn new(projection: NixProjection) -> Self {
+    #[must_use] pub fn new(projection: NixProjection) -> Self {
         Self {
             command_handler: NixCommandHandler::new(),
             query_handler: AdvancedNixQueryHandler::new(projection),
@@ -306,11 +298,7 @@ impl NixPackageService {
         // Extract output path
         let output = events.iter()
             .find_map(|e| {
-                if let Some(built) = e.as_any().downcast_ref::<PackageBuilt>() {
-                    Some(built.output_path.clone())
-                } else {
-                    None
-                }
+                e.as_any().downcast_ref::<PackageBuilt>().map(|built| built.output_path.clone())
             })
             .unwrap_or_else(|| output_path.unwrap_or_else(|| PathBuf::from("./result")));
 
@@ -330,11 +318,7 @@ impl NixPackageService {
         // Extract freed bytes
         let freed = events.iter()
             .find_map(|e| {
-                if let Some(gc) = e.as_any().downcast_ref::<GarbageCollected>() {
-                    Some(gc.freed_bytes)
-                } else {
-                    None
-                }
+                e.as_any().downcast_ref::<GarbageCollected>().map(|gc| gc.freed_bytes)
             })
             .unwrap_or(0);
 
@@ -360,22 +344,22 @@ pub struct NixServiceFactory {
 
 impl NixServiceFactory {
     /// Create a new service factory
-    pub fn new(projection: NixProjection) -> Self {
+    #[must_use] pub fn new(projection: NixProjection) -> Self {
         Self { projection }
     }
 
     /// Create a development service
-    pub fn development_service(&self) -> NixDevelopmentService {
+    #[must_use] pub fn development_service(&self) -> NixDevelopmentService {
         NixDevelopmentService::new(self.projection.clone())
     }
 
     /// Create a configuration service
-    pub fn configuration_service(&self) -> NixOSConfigurationService {
+    #[must_use] pub fn configuration_service(&self) -> NixOSConfigurationService {
         NixOSConfigurationService::new(self.projection.clone())
     }
 
     /// Create a package service
-    pub fn package_service(&self) -> NixPackageService {
+    #[must_use] pub fn package_service(&self) -> NixPackageService {
         NixPackageService::new(self.projection.clone())
     }
 } 

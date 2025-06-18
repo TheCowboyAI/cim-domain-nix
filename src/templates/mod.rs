@@ -20,7 +20,7 @@ pub enum FlakeTemplate {
     Haskell,
     /// Multi-language project
     Polyglot,
-    /// NixOS system configuration
+    /// `NixOS` system configuration
     NixOSSystem,
     /// Home Manager configuration
     HomeManager,
@@ -32,7 +32,7 @@ pub enum FlakeTemplate {
 
 impl FlakeTemplate {
     /// Generate flake.nix content for the template
-    pub fn generate_flake_nix(&self) -> String {
+    #[must_use] pub fn generate_flake_nix(&self) -> String {
         match self {
             FlakeTemplate::Rust => self.rust_template(),
             FlakeTemplate::Python => self.python_template(),
@@ -49,7 +49,7 @@ impl FlakeTemplate {
     }
 
     /// Generate additional files for the template
-    pub fn additional_files(&self) -> HashMap<String, String> {
+    #[must_use] pub fn additional_files(&self) -> HashMap<String, String> {
         let mut files = HashMap::new();
 
         match self {
@@ -63,7 +63,7 @@ impl FlakeTemplate {
                 files.insert(".envrc".to_string(), "use flake\n".to_string());
                 files.insert(".gitignore".to_string(), "/.venv\n/__pycache__\n/result\n".to_string());
                 files.insert("pyproject.toml".to_string(), self.python_pyproject_toml());
-                files.insert("src/__init__.py".to_string(), "".to_string());
+                files.insert("src/__init__.py".to_string(), String::new());
             }
             FlakeTemplate::NodeJs => {
                 files.insert(".envrc".to_string(), "use flake\n".to_string());

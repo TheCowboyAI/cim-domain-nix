@@ -1,6 +1,6 @@
 //! Query handlers for Nix domain
 
-use crate::{projections::*, value_objects::*, Result};
+use crate::{projections::NixProjection, value_objects::{FlakeRef, FlakeOutputs}, Result};
 use std::path::PathBuf;
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -45,7 +45,7 @@ pub struct NixQueryHandler {
 
 impl NixQueryHandler {
     /// Create a new query handler with the given projection
-    pub fn new(projection: NixProjection) -> Self {
+    #[must_use] pub fn new(projection: NixProjection) -> Self {
         Self { projection }
     }
 
@@ -79,7 +79,7 @@ impl NixQueryHandler {
         }))
     }
 
-    /// Find a NixOS configuration by name
+    /// Find a `NixOS` configuration by name
     pub fn find_configuration(&self, query: FindConfigurationQuery) -> Result<Option<ConfigurationView>> {
         Ok(self.projection.configuration_projection.configurations.get(&query.name).map(|info| ConfigurationView {
             id: info.id,
@@ -98,7 +98,7 @@ pub struct AdvancedNixQueryHandler {
 
 impl AdvancedNixQueryHandler {
     /// Create a new advanced query handler with the given projection
-    pub fn new(projection: NixProjection) -> Self {
+    #[must_use] pub fn new(projection: NixProjection) -> Self {
         Self { projection }
     }
 
@@ -109,7 +109,7 @@ impl AdvancedNixQueryHandler {
         
         for (key, package) in &self.projection.package_projection.packages {
             if package.name.contains(&query.query) || 
-               package.description.as_ref().map(|d| d.contains(&query.query)).unwrap_or(false) {
+               package.description.as_ref().is_some_and(|d| d.contains(&query.query)) {
                 results.push(PackageSearchResult {
                     name: package.name.clone(),
                     version: package.version.clone(),

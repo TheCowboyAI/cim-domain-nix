@@ -1,6 +1,6 @@
 //! Read models and projections for the Nix domain
 
-use crate::{events::*, value_objects::*};
+use crate::{events::{FlakeCreated, FlakeInputAdded, PackageBuilt, ActivationType, ConfigurationCreated, ConfigurationActivated, NixDomainEvent}, value_objects::{FlakeRef, FlakeOutputs, AttributePath}};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -176,7 +176,7 @@ pub struct ConfigurationInfo {
     pub activation_history: Vec<(DateTime<Utc>, ActivationType, u32)>,
 }
 
-/// Projection for NixOS configurations
+/// Projection for `NixOS` configurations
 #[derive(Debug, Clone, Default)]
 pub struct ConfigurationProjection {
     /// Configurations by name

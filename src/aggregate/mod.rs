@@ -3,7 +3,7 @@
 //! This module contains aggregate roots that maintain consistency
 //! for Nix domain entities.
 
-use crate::{commands::*, events::*, value_objects::*, Result, NixDomainError};
+use crate::{commands::{CreateFlake, AddFlakeInput, CreateModule, CreateOverlay, CreateConfiguration, ActivateConfiguration}, events::{FlakeCreated, FlakeInputAdded, ModuleCreated, OverlayCreated, ConfigurationCreated, ConfigurationActivated}, value_objects::{Flake, FlakeInputs, FlakeOutputs, FlakeRef, NixModule, Overlay, NixOSConfiguration}, Result, NixDomainError};
 use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::Utc;
@@ -17,7 +17,7 @@ pub struct FlakeAggregate {
 
 impl FlakeAggregate {
     /// Create a new flake aggregate
-    pub fn new(flake: Flake) -> Self {
+    #[must_use] pub fn new(flake: Flake) -> Self {
         Self { flake }
     }
 
@@ -94,7 +94,7 @@ pub struct ModuleAggregate {
 
 impl ModuleAggregate {
     /// Create a new module aggregate
-    pub fn new(module: NixModule) -> Self {
+    #[must_use] pub fn new(module: NixModule) -> Self {
         Self { module }
     }
 
@@ -121,7 +121,7 @@ pub struct OverlayAggregate {
 
 impl OverlayAggregate {
     /// Create a new overlay aggregate
-    pub fn new(overlay: Overlay) -> Self {
+    #[must_use] pub fn new(overlay: Overlay) -> Self {
         Self { overlay }
     }
 
@@ -150,7 +150,7 @@ pub struct ConfigurationAggregate {
 
 impl ConfigurationAggregate {
     /// Create a new configuration aggregate
-    pub fn new(configuration: NixOSConfiguration) -> Self {
+    #[must_use] pub fn new(configuration: NixOSConfiguration) -> Self {
         Self {
             configuration,
             current_generation: 0,
