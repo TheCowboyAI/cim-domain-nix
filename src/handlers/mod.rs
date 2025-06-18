@@ -19,10 +19,12 @@ use chrono::Utc;
 pub struct FlakeCommandHandler;
 
 impl FlakeCommandHandler {
+    /// Create a new flake command handler
     pub fn new() -> Self {
         Self
     }
 
+    /// Handle create flake command
     async fn create_flake(&self, cmd: CreateFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         // Create directory if it doesn't exist
         fs::create_dir_all(&cmd.path).await?;
@@ -94,6 +96,7 @@ impl FlakeCommandHandler {
         Ok(vec![Box::new(event)])
     }
 
+    /// Handle update flake command
     async fn update_flake(&self, cmd: UpdateFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         // Run nix flake update
         let output = Command::new("nix")
@@ -117,6 +120,7 @@ impl FlakeCommandHandler {
         Ok(vec![Box::new(event)])
     }
 
+    /// Handle add flake input command
     async fn add_flake_input(&self, cmd: AddFlakeInput) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         // Read current flake.nix
         let flake_path = cmd.path.join("flake.nix");
@@ -151,6 +155,7 @@ impl FlakeCommandHandler {
         Ok(vec![Box::new(event)])
     }
 
+    /// Handle check flake command
     async fn check_flake(&self, cmd: CheckFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let output = Command::new("nix")
             .args(&["flake", "check"])
@@ -168,6 +173,7 @@ impl FlakeCommandHandler {
         Ok(vec![])
     }
 
+    /// Handle develop flake command
     async fn develop_flake(&self, cmd: DevelopFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let mut args = vec!["develop"];
         
@@ -197,10 +203,12 @@ impl FlakeCommandHandler {
 pub struct PackageCommandHandler;
 
 impl PackageCommandHandler {
+    /// Create a new package command handler
     pub fn new() -> Self {
         Self
     }
 
+    /// Handle build package command
     async fn build_package(&self, cmd: BuildPackage) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let start_time = std::time::Instant::now();
         
@@ -251,10 +259,12 @@ impl PackageCommandHandler {
 pub struct ExpressionCommandHandler;
 
 impl ExpressionCommandHandler {
+    /// Create a new expression command handler
     pub fn new() -> Self {
         Self
     }
 
+    /// Handle evaluate expression command
     async fn evaluate_expression(&self, cmd: EvaluateExpression) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let output = Command::new("nix")
             .args(&["eval", "--expr", &cmd.expression])
@@ -284,10 +294,12 @@ impl ExpressionCommandHandler {
 pub struct GarbageCollectionHandler;
 
 impl GarbageCollectionHandler {
+    /// Create a new garbage collection handler
     pub fn new() -> Self {
         Self
     }
 
+    /// Handle run garbage collection command
     async fn run_garbage_collection(&self, cmd: RunGarbageCollection) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let mut args = vec!["store", "gc"];
 
@@ -327,13 +339,18 @@ impl GarbageCollectionHandler {
 
 /// Main command handler that delegates to specific handlers
 pub struct NixCommandHandler {
+    /// Handler for flake operations
     flake_handler: FlakeCommandHandler,
+    /// Handler for package operations
     package_handler: PackageCommandHandler,
+    /// Handler for expression evaluation
     expression_handler: ExpressionCommandHandler,
+    /// Handler for garbage collection
     gc_handler: GarbageCollectionHandler,
 }
 
 impl NixCommandHandler {
+    /// Create a new Nix command handler
     pub fn new() -> Self {
         Self {
             flake_handler: FlakeCommandHandler::new(),
@@ -343,6 +360,7 @@ impl NixCommandHandler {
         }
     }
 
+    /// Handle any Nix command by delegating to the appropriate handler
     pub async fn handle_command(&self, cmd: Box<dyn NixCommand>) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         // Downcast to specific command types
         if let Some(create_flake) = cmd.as_any().downcast_ref::<CreateFlake>() {

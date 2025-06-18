@@ -18,8 +18,11 @@ pub trait NixCommand: Send + Sync {
 /// Command to create a new flake
 #[derive(Debug, Clone)]
 pub struct CreateFlake {
+    /// Path where the flake will be created
     pub path: PathBuf,
+    /// Human-readable description for the flake
     pub description: String,
+    /// Optional template to use for initialization
     pub template: Option<String>,
 }
 
@@ -36,6 +39,7 @@ impl NixCommand for CreateFlake {
 /// Command to update a flake
 #[derive(Debug, Clone)]
 pub struct UpdateFlake {
+    /// Path to the flake to update
     pub path: PathBuf,
 }
 
@@ -52,8 +56,11 @@ impl NixCommand for UpdateFlake {
 /// Command to add an input to a flake
 #[derive(Debug, Clone)]
 pub struct AddFlakeInput {
+    /// Path to the flake to modify
     pub path: PathBuf,
+    /// Name of the input to add
     pub name: String,
+    /// URL of the input flake
     pub url: String,
 }
 
@@ -70,8 +77,11 @@ impl NixCommand for AddFlakeInput {
 /// Command to build a package
 #[derive(Debug, Clone)]
 pub struct BuildPackage {
+    /// Flake reference to build from
     pub flake_ref: String,
+    /// Attribute path to the package
     pub attribute: AttributePath,
+    /// Optional output path override
     pub output_path: Option<PathBuf>,
 }
 
@@ -88,8 +98,11 @@ impl NixCommand for BuildPackage {
 /// Command to create a module
 #[derive(Debug, Clone)]
 pub struct CreateModule {
+    /// Unique command identifier
     pub command_id: Uuid,
+    /// Module name
     pub name: String,
+    /// The module to create
     pub module: NixModule,
 }
 
@@ -106,8 +119,11 @@ impl NixCommand for CreateModule {
 /// Command to create an overlay
 #[derive(Debug, Clone)]
 pub struct CreateOverlay {
+    /// Unique command identifier
     pub command_id: Uuid,
+    /// Overlay name
     pub name: String,
+    /// The overlay to create
     pub overlay: Overlay,
 }
 
@@ -124,7 +140,9 @@ impl NixCommand for CreateOverlay {
 /// Command to create a configuration
 #[derive(Debug, Clone)]
 pub struct CreateConfiguration {
+    /// Configuration name
     pub name: String,
+    /// The configuration to create
     pub configuration: NixOSConfiguration,
 }
 
@@ -141,7 +159,9 @@ impl NixCommand for CreateConfiguration {
 /// Command to activate a configuration
 #[derive(Debug, Clone)]
 pub struct ActivateConfiguration {
+    /// Configuration name to activate
     pub name: String,
+    /// Type of activation to perform
     pub activation_type: ActivationType,
 }
 
@@ -158,6 +178,7 @@ impl NixCommand for ActivateConfiguration {
 /// Command to evaluate a Nix expression
 #[derive(Debug, Clone)]
 pub struct EvaluateExpression {
+    /// Nix expression to evaluate
     pub expression: String,
 }
 
@@ -174,6 +195,7 @@ impl NixCommand for EvaluateExpression {
 /// Command to run garbage collection
 #[derive(Debug, Clone)]
 pub struct RunGarbageCollection {
+    /// Optional: only collect items older than this many days
     pub older_than_days: Option<u32>,
 }
 
@@ -190,6 +212,7 @@ impl NixCommand for RunGarbageCollection {
 /// Command to check a flake
 #[derive(Debug, Clone)]
 pub struct CheckFlake {
+    /// Path to the flake to check
     pub path: PathBuf,
 }
 
@@ -206,7 +229,9 @@ impl NixCommand for CheckFlake {
 /// Command to enter a development shell
 #[derive(Debug, Clone)]
 pub struct DevelopFlake {
+    /// Path to the flake with devShell
     pub path: PathBuf,
+    /// Optional command to run in the shell
     pub command: Option<String>,
 }
 

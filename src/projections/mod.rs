@@ -9,12 +9,19 @@ use chrono::{DateTime, Utc};
 /// Information about a flake
 #[derive(Debug, Clone)]
 pub struct FlakeInfo {
+    /// Unique identifier for the flake
     pub id: Uuid,
+    /// Path to the flake directory
     pub path: PathBuf,
+    /// Human-readable description
     pub description: String,
+    /// Flake inputs (dependencies)
     pub inputs: HashMap<String, FlakeRef>,
+    /// Flake outputs (packages, shells, etc.)
     pub outputs: FlakeOutputs,
+    /// Last time the flake was updated
     pub last_updated: DateTime<Utc>,
+    /// Last time the flake was checked for validity
     pub last_checked: Option<DateTime<Utc>>,
 }
 
@@ -67,21 +74,32 @@ impl FlakeProjection {
 /// Information about a package
 #[derive(Debug, Clone)]
 pub struct PackageInfo {
+    /// Package name
     pub name: String,
+    /// Target system architecture
     pub system: String,
+    /// Package version if available
     pub version: Option<String>,
+    /// Package description if available
     pub description: Option<String>,
+    /// Flake reference containing the package
     pub flake_ref: String,
+    /// Attribute path to the package
     pub attribute_path: AttributePath,
 }
 
 /// Build information
 #[derive(Debug, Clone)]
 pub struct BuildInfo {
+    /// Unique identifier for the build
     pub package_id: Uuid,
+    /// Output path in the Nix store
     pub output_path: PathBuf,
+    /// Time taken to build
     pub build_time: std::time::Duration,
+    /// When the build occurred
     pub timestamp: DateTime<Utc>,
+    /// Whether the build succeeded
     pub success: bool,
 }
 
@@ -94,8 +112,11 @@ pub struct PackageBuildProjection {
     pub builds: Vec<BuildInfo>,
     /// Build statistics
     pub total_builds: u64,
+    /// Number of successful builds
     pub successful_builds: u64,
+    /// Number of failed builds
     pub failed_builds: u64,
+    /// Average build time across all builds
     pub average_build_time: std::time::Duration,
 }
 
@@ -139,12 +160,19 @@ impl PackageBuildProjection {
 /// Configuration information
 #[derive(Debug, Clone)]
 pub struct ConfigurationInfo {
+    /// Unique identifier for the configuration
     pub id: Uuid,
+    /// Configuration name
     pub name: String,
+    /// Target system architecture
     pub system: String,
+    /// Hostname for the system
     pub hostname: String,
+    /// Current generation number
     pub current_generation: u32,
+    /// Last activation timestamp
     pub last_activated: Option<DateTime<Utc>>,
+    /// History of activations (timestamp, type, generation)
     pub activation_history: Vec<(DateTime<Utc>, ActivationType, u32)>,
 }
 
@@ -200,8 +228,11 @@ impl ConfigurationProjection {
 /// Combined projection for all Nix domain data
 #[derive(Debug, Clone, Default)]
 pub struct NixProjection {
+    /// Flake-related projections
     pub flake_projection: FlakeProjection,
+    /// Package build projections
     pub package_projection: PackageBuildProjection,
+    /// Configuration projections
     pub configuration_projection: ConfigurationProjection,
 }
 
@@ -215,24 +246,36 @@ impl NixProjection {
 
 /// View model for flake information
 pub struct FlakeView {
+    /// Unique identifier for the flake
     pub id: Uuid,
+    /// Path to the flake directory
     pub path: PathBuf,
+    /// Human-readable description
     pub description: String,
+    /// Last update timestamp
     pub last_updated: DateTime<Utc>,
 }
 
 /// View model for package information
 pub struct PackageView {
+    /// Package name
     pub name: String,
+    /// Attribute path to the package
     pub attribute_path: String,
+    /// Store path if built
     pub store_path: Option<PathBuf>,
+    /// Last build timestamp
     pub last_built: Option<DateTime<Utc>>,
 }
 
 /// View model for configuration information
 pub struct ConfigurationView {
+    /// Unique identifier for the configuration
     pub id: Uuid,
+    /// Configuration name
     pub name: String,
+    /// Target system architecture
     pub system: String,
+    /// Current generation number
     pub current_generation: Option<u64>,
 } 

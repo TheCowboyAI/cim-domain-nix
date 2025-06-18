@@ -47,36 +47,47 @@ use thiserror::Error;
 /// Domain-specific errors for Nix operations
 #[derive(Error, Debug)]
 pub enum NixDomainError {
+    /// Error related to Nix flake operations
     #[error("Flake error: {0}")]
     FlakeError(String),
 
+    /// Error during Nix build operations
     #[error("Build error: {0}")]
     BuildError(String),
 
+    /// Error parsing Nix expressions or configurations
     #[error("Parse error: {0}")]
     ParseError(String),
 
+    /// I/O operation error
     #[error("IO error")]
     IoError(#[from] std::io::Error),
 
+    /// Error executing Nix commands
     #[error("Command execution error: {0}")]
     CommandError(String),
 
+    /// Resource not found error
     #[error("Not found: {0}")]
     NotFound(String),
 
+    /// Invalid state transition or operation
     #[error("Invalid state: {0}")]
     InvalidState(String),
 
+    /// General domain logic error
     #[error("Domain error: {0}")]
     DomainError(String),
 
+    /// Error during command execution
     #[error("Execution error: {0}")]
     ExecutionError(String),
 
+    /// Error related to Nix package operations
     #[error("Package error: {0}")]
     PackageError(String),
 
+    /// Catch-all for other errors
     #[error("Other error: {0}")]
     Other(String),
 }

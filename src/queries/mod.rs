@@ -9,26 +9,32 @@ use chrono::{DateTime, Utc};
 /// Query to find a flake by path
 #[derive(Debug, Clone)]
 pub struct FindFlakeQuery {
+    /// Path to the flake directory
     pub path: PathBuf,
 }
 
 /// Query to find a package by name
 #[derive(Debug, Clone)]
 pub struct FindPackageQuery {
+    /// Package name to search for
     pub name: String,
+    /// Optional system architecture (defaults to x86_64-linux)
     pub system: Option<String>,
 }
 
 /// Query to find a configuration by name
 #[derive(Debug, Clone)]
 pub struct FindConfigurationQuery {
+    /// Configuration name (e.g., hostname)
     pub name: String,
 }
 
 /// Query to search nixpkgs
 #[derive(Debug, Clone)]
 pub struct SearchNixPackagesQuery {
+    /// Search query string
     pub query: String,
+    /// Maximum number of results to return
     pub limit: Option<usize>,
 }
 
@@ -38,10 +44,12 @@ pub struct NixQueryHandler {
 }
 
 impl NixQueryHandler {
+    /// Create a new query handler with the given projection
     pub fn new(projection: NixProjection) -> Self {
         Self { projection }
     }
 
+    /// Find a flake by its file path
     pub fn find_flake(&self, query: FindFlakeQuery) -> Result<Option<FlakeView>> {
         if let Some(flake_id) = self.projection.flake_projection.flakes_by_path.get(&query.path) {
             Ok(self.projection.flake_projection.flakes.get(flake_id).map(|info| FlakeView {
@@ -56,6 +64,7 @@ impl NixQueryHandler {
         }
     }
 
+    /// Find a package by name and optional system architecture
     pub fn find_package(&self, query: FindPackageQuery) -> Result<Option<PackageView>> {
         let key = format!("{}#{}", 
             query.system.as_deref().unwrap_or("x86_64-linux"), 
@@ -70,6 +79,7 @@ impl NixQueryHandler {
         }))
     }
 
+    /// Find a NixOS configuration by name
     pub fn find_configuration(&self, query: FindConfigurationQuery) -> Result<Option<ConfigurationView>> {
         Ok(self.projection.configuration_projection.configurations.get(&query.name).map(|info| ConfigurationView {
             id: info.id,
@@ -87,6 +97,7 @@ pub struct AdvancedNixQueryHandler {
 }
 
 impl AdvancedNixQueryHandler {
+    /// Create a new advanced query handler with the given projection
     pub fn new(projection: NixProjection) -> Self {
         Self { projection }
     }
@@ -121,37 +132,55 @@ impl AdvancedNixQueryHandler {
 /// View model for flake information
 #[derive(Debug, Clone)]
 pub struct FlakeView {
+    /// Unique identifier for the flake
     pub id: Uuid,
+    /// Path to the flake directory
     pub path: PathBuf,
+    /// Human-readable description of the flake
     pub description: String,
+    /// Input dependencies of the flake
     pub inputs: HashMap<String, FlakeRef>,
+    /// Outputs provided by the flake
     pub outputs: FlakeOutputs,
 }
 
 /// View model for package information
 #[derive(Debug, Clone)]
 pub struct PackageView {
+    /// Package name
     pub name: String,
+    /// Target system architecture
     pub system: String,
+    /// Package version if available
     pub version: Option<String>,
+    /// Package description if available
     pub description: Option<String>,
 }
 
 /// View model for configuration information
 #[derive(Debug, Clone)]
 pub struct ConfigurationView {
+    /// Unique identifier for the configuration
     pub id: Uuid,
+    /// Configuration name (usually hostname)
     pub name: String,
+    /// Target system architecture
     pub system: String,
+    /// Current generation number
     pub current_generation: u32,
+    /// Last activation timestamp
     pub last_activated: Option<DateTime<Utc>>,
 }
 
 /// Search result for packages
 #[derive(Debug, Clone)]
 pub struct PackageSearchResult {
+    /// Package name
     pub name: String,
+    /// Package version if available
     pub version: Option<String>,
+    /// Package description if available
     pub description: Option<String>,
+    /// Nix attribute path to the package
     pub attribute_path: String,
 } 
