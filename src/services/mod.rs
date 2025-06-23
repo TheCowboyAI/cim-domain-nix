@@ -1,8 +1,10 @@
-//! High-level services for Nix domain operations
+//! Domain services for Nix operations
 
 use crate::{
-    commands::{CreateFlake, NixCommand, AddFlakeInput, CheckFlake, BuildPackage, DevelopFlake, CreateConfiguration, ActivateConfiguration, RunGarbageCollection},
-    events::{NixDomainEvent, FlakeCreated, PackageBuilt, ActivationType, ConfigurationActivated, GarbageCollected},
+    commands::{CreateFlake, AddFlakeInput, CheckFlake, BuildPackage, DevelopFlake,
+               CreateConfiguration, ActivateConfiguration, RunGarbageCollection},
+    events::{FlakeCreated, PackageBuilt, ActivationType, ConfigurationActivated, GarbageCollected},
+    value_objects::{Flake, FlakeRef, AttributePath, StorePath, Derivation, NixOSConfiguration},
     handlers::NixCommandHandler,
     projections::NixProjection,
     queries::{
@@ -10,10 +12,10 @@ use crate::{
         FindFlakeQuery, FindPackageQuery, FindConfigurationQuery, SearchNixPackagesQuery,
         FlakeView, PackageView, ConfigurationView, PackageSearchResult,
     },
-    value_objects::{AttributePath, NixOSConfiguration},
     Result, NixDomainError,
 };
 use std::path::PathBuf;
+use std::process::Command;
 use uuid::Uuid;
 
 /// Service for managing Nix development environments

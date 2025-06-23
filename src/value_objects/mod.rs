@@ -253,3 +253,26 @@ pub struct NixExpression {
     /// Whether this expression is pure
     pub is_pure: bool,
 } 
+
+/// Represents different types of Nix values
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum NixValue {
+    /// String value
+    String(String),
+    /// Integer value
+    Int(i64),
+    /// Float value
+    Float(f64),
+    /// Boolean value
+    Bool(bool),
+    /// Path value
+    Path(PathBuf),
+    /// List of values
+    List(Vec<NixValue>),
+    /// Attribute set (key-value pairs)
+    AttrSet(HashMap<String, NixValue>),
+    /// Null value
+    Null,
+}
+
+ 

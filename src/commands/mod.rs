@@ -2,9 +2,11 @@
 
 use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration};
 use crate::events::ActivationType;
+use crate::aggregate::FlakeAggregate;
 use std::path::PathBuf;
 use uuid::Uuid;
 use std::any::Any;
+use cim_domain::{Command, EntityId};
 
 /// Base trait for all Nix commands
 pub trait NixCommand: Send + Sync {
@@ -36,6 +38,14 @@ impl NixCommand for CreateFlake {
     }
 }
 
+impl cim_domain::Command for CreateFlake {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Creating new aggregate
+    }
+}
+
 /// Command to update a flake
 #[derive(Debug, Clone)]
 pub struct UpdateFlake {
@@ -50,6 +60,14 @@ impl NixCommand for UpdateFlake {
     
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl cim_domain::Command for UpdateFlake {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Would need flake ID to properly identify
     }
 }
 
@@ -74,6 +92,14 @@ impl NixCommand for AddFlakeInput {
     }
 }
 
+impl cim_domain::Command for AddFlakeInput {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Would need flake ID to properly identify
+    }
+}
+
 /// Command to build a package
 #[derive(Debug, Clone)]
 pub struct BuildPackage {
@@ -92,6 +118,14 @@ impl NixCommand for BuildPackage {
     
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl cim_domain::Command for BuildPackage {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Build is a query operation on a flake
     }
 }
 
@@ -116,6 +150,14 @@ impl NixCommand for CreateModule {
     }
 }
 
+impl cim_domain::Command for CreateModule {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Modules are created within flakes
+    }
+}
+
 /// Command to create an overlay
 #[derive(Debug, Clone)]
 pub struct CreateOverlay {
@@ -134,6 +176,14 @@ impl NixCommand for CreateOverlay {
     
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl cim_domain::Command for CreateOverlay {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Overlays are created within flakes
     }
 }
 
@@ -156,6 +206,14 @@ impl NixCommand for CreateConfiguration {
     }
 }
 
+impl cim_domain::Command for CreateConfiguration {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Configurations may be standalone
+    }
+}
+
 /// Command to activate a configuration
 #[derive(Debug, Clone)]
 pub struct ActivateConfiguration {
@@ -172,6 +230,14 @@ impl NixCommand for ActivateConfiguration {
     
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl cim_domain::Command for ActivateConfiguration {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Activation affects system state
     }
 }
 
@@ -192,6 +258,14 @@ impl NixCommand for EvaluateExpression {
     }
 }
 
+impl cim_domain::Command for EvaluateExpression {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Expression evaluation is stateless
+    }
+}
+
 /// Command to run garbage collection
 #[derive(Debug, Clone)]
 pub struct RunGarbageCollection {
@@ -206,6 +280,14 @@ impl NixCommand for RunGarbageCollection {
     
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl cim_domain::Command for RunGarbageCollection {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // GC is a system-wide operation
     }
 }
 
@@ -226,6 +308,14 @@ impl NixCommand for CheckFlake {
     }
 }
 
+impl cim_domain::Command for CheckFlake {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Check is a query operation
+    }
+}
+
 /// Command to enter a development shell
 #[derive(Debug, Clone)]
 pub struct DevelopFlake {
@@ -242,5 +332,13 @@ impl NixCommand for DevelopFlake {
     
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl cim_domain::Command for DevelopFlake {
+    type Aggregate = FlakeAggregate;
+
+    fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
+        None // Develop is an interactive operation
     }
 } 

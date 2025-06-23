@@ -3,10 +3,11 @@
 //! This module provides the isomorphic mapping between Git's content-addressed
 //! storage and Nix's store paths, enabling seamless integration between the two systems.
 
+pub mod analyzer;
+pub mod flake_lock_tracker;
+
 use crate::{
     value_objects::*,
-    events::*,
-    commands::*,
     Result, NixDomainError,
 };
 use std::path::{Path, PathBuf};
@@ -15,61 +16,11 @@ use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-// Mock types until cim-domain-git exports them
-/// Represents a Git repository
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitRepository {
-    /// Path to the repository
-    pub path: PathBuf,
-    /// Remote URL
-    pub url: String,
-}
-
-/// Represents a Git commit
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitCommit {
-    /// Commit hash
-    pub hash: GitHash,
-    /// Commit message
-    pub message: String,
-    /// Author
-    pub author: String,
-    /// Timestamp
-    pub timestamp: DateTime<Utc>,
-}
-
-/// Represents a Git hash
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct GitHash(String);
-
-impl GitHash {
-    /// Create from string
-    pub fn from(s: impl Into<String>) -> Self {
-        Self(s.into())
-    }
-    
-    /// Convert to string
-    pub fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-
-impl std::fmt::Display for GitHash {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-/// Represents a Git reference (branch, tag, or commit)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitRef(String);
-
-impl GitRef {
-    /// Create from string
-    pub fn from(s: impl Into<String>) -> Self {
-        Self(s.into())
-    }
-}
+// Re-export Git domain types
+pub use cim_domain_git::{
+    value_objects::{CommitHash, BranchName, RemoteUrl, AuthorInfo, FilePath},
+    GitDomainError,
+};
 
 /// Represents a Git-backed Nix flake with content-addressed properties
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,11 +30,22 @@ pub struct GitFlake {
     /// Git repository information
     pub git_repo: GitRepository,
     /// Mapping of Git commits to Nix store paths
-    pub commit_store_mapping: HashMap<GitHash, StorePath>,
+    pub commit_store_mapping: HashMap<CommitHash, StorePath>,
     /// The current Git revision
-    pub current_revision: GitHash,
+    pub current_revision: CommitHash,
     /// Whether this is a shallow clone
     pub shallow: bool,
+}
+
+/// Represents a Git repository
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitRepository {
+    /// Path to the repository
+    pub path: PathBuf,
+    /// Remote URL
+    pub url: RemoteUrl,
+    /// Default branch
+    pub default_branch: BranchName,
 }
 
 /// Represents a Nix input that comes from Git
@@ -94,13 +56,15 @@ pub struct GitFlakeInput {
     /// Git URL (e.g., "github:owner/repo", "git+https://...")
     pub url: String,
     /// Optional Git ref (branch, tag, or commit)
-    pub git_ref: Option<GitRef>,
+    pub git_ref: Option<String>,
     /// Resolved Git hash
-    pub resolved_hash: Option<GitHash>,
+    pub resolved_hash: Option<CommitHash>,
     /// Corresponding Nix store path
     pub store_path: Option<StorePath>,
     /// Whether to follow the input's flake
     pub follows: Option<String>,
+    /// Last modified timestamp
+    pub last_modified: Option<DateTime<Utc>>,
 }
 
 /// Maps between Git URLs and Nix flake references
@@ -139,6 +103,13 @@ impl GitNixMapper {
             name: "gitlab".to_string(),
             url_template: "https://gitlab.com/{owner}/{repo}".to_string(),
             flake_ref_template: "gitlab:{owner}/{repo}".to_string(),
+        });
+        
+        // Sourcehut mapping
+        forge_mappings.insert("sourcehut".to_string(), ForgeMapping {
+            name: "sourcehut".to_string(),
+            url_template: "https://git.sr.ht/~{owner}/{repo}".to_string(),
+            flake_ref_template: "sourcehut:~{owner}/{repo}".to_string(),
         });
         
         Self {
@@ -189,13 +160,24 @@ impl GitNixMapper {
             }
         }
         
+        if url.starts_with("https://git.sr.ht/~") {
+            let parts: Vec<&str> = url.trim_start_matches("https://git.sr.ht/~")
+                .trim_end_matches(".git")
+                .split('/')
+                .collect();
+            
+            if parts.len() >= 2 {
+                return Some(("sourcehut".to_string(), format!("~{}", parts[0]), parts[1].to_string()));
+            }
+        }
+        
         None
     }
     
     /// Map a Git hash to a Nix store path
-    pub async fn git_hash_to_store_path(&self, git_hash: &GitHash) -> Result<StorePath> {
+    pub async fn git_hash_to_store_path(&self, git_hash: &CommitHash) -> Result<StorePath> {
         // Check cache first
-        if let Some(cached) = self.resolution_cache.get(&git_hash.to_string()) {
+        if let Some(cached) = self.resolution_cache.get(git_hash.as_str()) {
             return Ok(cached.clone());
         }
         
@@ -219,6 +201,13 @@ impl GitNixMapper {
         
         let store_path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
         StorePath::parse(&store_path_str)
+            .map_err(|e| NixDomainError::ParseError(e))
+    }
+}
+
+impl Default for GitNixMapper {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -242,8 +231,12 @@ impl GitFlakeService {
         target_path: PathBuf,
         description: String,
     ) -> Result<GitFlake> {
+        // Parse the URL
+        let remote_url = RemoteUrl::new(git_url)
+            .map_err(|e| NixDomainError::ParseError(e.to_string()))?;
+        
         // Clone the Git repository
-        let git_repo = self.clone_repository(git_url, &target_path).await?;
+        let git_repo = self.clone_repository(&remote_url, &target_path).await?;
         
         // Get the current commit hash
         let current_revision = self.get_current_revision(&target_path).await?;
@@ -279,8 +272,10 @@ impl GitFlakeService {
         // Read flake.lock if it exists
         let lock_path = git_flake.flake.path.join("flake.lock");
         if lock_path.exists() {
-            let lock_content = tokio::fs::read_to_string(&lock_path).await?;
-            let lock_data: serde_json::Value = serde_json::from_str(&lock_content)?;
+            let lock_content = tokio::fs::read_to_string(&lock_path).await
+                .map_err(NixDomainError::IoError)?;
+            let lock_data: serde_json::Value = serde_json::from_str(&lock_content)
+                .map_err(|e| NixDomainError::ParseError(e.to_string()))?;
             
             // Parse inputs from lock file
             if let Some(nodes) = lock_data.get("nodes").and_then(|n| n.as_object()) {
@@ -300,27 +295,31 @@ impl GitFlakeService {
         Ok(updated_inputs)
     }
     
-    /// Map FHS paths to Nix store paths
-    pub fn map_fhs_to_store(&self, fhs_path: &Path) -> Result<StorePath> {
-        // This would implement the mapping logic from FHS to /nix/store
-        // For now, we'll use a simple heuristic
-        
-        let path_str = fhs_path.to_string_lossy();
-        
-        // Check if it's already a store path
-        if path_str.starts_with("/nix/store/") {
-            return StorePath::parse(&path_str);
-        }
-        
-        // Otherwise, we need to determine what package provides this path
-        // This would typically involve querying Nix's database
-        Err(NixDomainError::NotFound(format!("No store path mapping for FHS path: {}", path_str)))
+    /// Get flake.lock history from Git
+    pub async fn get_flake_lock_history(
+        &self,
+        repo_path: &Path,
+        limit: Option<usize>,
+    ) -> Result<Vec<FlakeLockCommit>> {
+        let analyzer = analyzer::GitNixAnalyzer::new();
+        analyzer.get_flake_lock_history(repo_path, limit).await
+    }
+    
+    /// Analyze dependency changes between commits
+    pub async fn analyze_dependency_changes(
+        &self,
+        repo_path: &Path,
+        from_commit: &CommitHash,
+        to_commit: &CommitHash,
+    ) -> Result<DependencyChanges> {
+        let analyzer = analyzer::GitNixAnalyzer::new();
+        analyzer.analyze_dependency_changes(repo_path, from_commit, to_commit).await
     }
     
     /// Clone a Git repository
-    async fn clone_repository(&self, git_url: &str, target_path: &Path) -> Result<GitRepository> {
+    async fn clone_repository(&self, git_url: &RemoteUrl, target_path: &Path) -> Result<GitRepository> {
         let output = tokio::process::Command::new("git")
-            .args(&["clone", git_url, target_path.to_str().unwrap()])
+            .args(&["clone", git_url.as_str(), target_path.to_str().unwrap()])
             .output()
             .await
             .map_err(|e| NixDomainError::CommandError(format!("Failed to clone repository: {}", e)))?;
@@ -331,14 +330,18 @@ impl GitFlakeService {
             ));
         }
         
+        // Get default branch
+        let default_branch = self.get_default_branch(target_path).await?;
+        
         Ok(GitRepository {
             path: target_path.to_path_buf(),
-            url: git_url.to_string(),
+            url: git_url.clone(),
+            default_branch,
         })
     }
     
     /// Get the current Git revision
-    async fn get_current_revision(&self, repo_path: &Path) -> Result<GitHash> {
+    async fn get_current_revision(&self, repo_path: &Path) -> Result<CommitHash> {
         let output = tokio::process::Command::new("git")
             .args(&["rev-parse", "HEAD"])
             .current_dir(repo_path)
@@ -353,7 +356,33 @@ impl GitFlakeService {
         }
         
         let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        Ok(GitHash::from(hash))
+        CommitHash::new(hash)
+            .map_err(|e| NixDomainError::ParseError(e.to_string()))
+    }
+    
+    /// Get the default branch
+    async fn get_default_branch(&self, repo_path: &Path) -> Result<BranchName> {
+        let output = tokio::process::Command::new("git")
+            .args(&["symbolic-ref", "refs/remotes/origin/HEAD"])
+            .current_dir(repo_path)
+            .output()
+            .await
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to get default branch: {}", e)))?;
+        
+        if output.status.success() {
+            let branch = String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .strip_prefix("refs/remotes/origin/")
+                .unwrap_or("main")
+                .to_string();
+            
+            BranchName::new(branch)
+                .map_err(|e| NixDomainError::ParseError(e.to_string()))
+        } else {
+            // Fallback to main
+            BranchName::new("main")
+                .map_err(|e| NixDomainError::ParseError(e.to_string()))
+        }
     }
     
     /// Parse a locked input from flake.lock
@@ -361,6 +390,11 @@ impl GitFlakeService {
         let input_type = locked.get("type")
             .and_then(|t| t.as_str())
             .ok_or_else(|| NixDomainError::ParseError("Missing input type".to_string()))?;
+        
+        let last_modified = locked.get("lastModified")
+            .and_then(|t| t.as_i64())
+            .map(|ts| DateTime::from_timestamp(ts, 0))
+            .flatten();
         
         match input_type {
             "github" => {
@@ -371,10 +405,11 @@ impl GitFlakeService {
                 Ok(GitFlakeInput {
                     name: name.to_string(),
                     url: format!("github:{}/{}", owner, repo),
-                    git_ref: rev.map(|r| GitRef::from(r)),
-                    resolved_hash: rev.map(|r| GitHash::from(r)),
+                    git_ref: locked.get("ref").and_then(|r| r.as_str()).map(String::from),
+                    resolved_hash: rev.and_then(|r| CommitHash::new(r).ok()),
                     store_path: None,
                     follows: None,
+                    last_modified,
                 })
             }
             "git" => {
@@ -384,10 +419,11 @@ impl GitFlakeService {
                 Ok(GitFlakeInput {
                     name: name.to_string(),
                     url: url.to_string(),
-                    git_ref: rev.map(|r| GitRef::from(r)),
-                    resolved_hash: rev.map(|r| GitHash::from(r)),
+                    git_ref: locked.get("ref").and_then(|r| r.as_str()).map(String::from),
+                    resolved_hash: rev.and_then(|r| CommitHash::new(r).ok()),
                     store_path: None,
                     follows: None,
+                    last_modified,
                 })
             }
             _ => Ok(GitFlakeInput {
@@ -397,9 +433,42 @@ impl GitFlakeService {
                 resolved_hash: None,
                 store_path: None,
                 follows: None,
+                last_modified,
             })
         }
     }
+}
+
+impl Default for GitFlakeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Represents a commit that modified flake.lock
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlakeLockCommit {
+    /// The commit hash
+    pub commit: CommitHash,
+    /// Commit timestamp
+    pub timestamp: DateTime<Utc>,
+    /// Commit message
+    pub message: String,
+    /// Author information
+    pub author: AuthorInfo,
+    /// The flake.lock content at this commit
+    pub lock_content: serde_json::Value,
+}
+
+/// Represents dependency changes between two commits
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DependencyChanges {
+    /// Added inputs
+    pub added: Vec<GitFlakeInput>,
+    /// Removed inputs
+    pub removed: Vec<GitFlakeInput>,
+    /// Updated inputs (old, new)
+    pub updated: Vec<(GitFlakeInput, GitFlakeInput)>,
 }
 
 /// Commands for Git-Nix integration
@@ -418,11 +487,12 @@ pub enum GitNixCommand {
     /// Pin a flake to a specific Git revision
     PinFlakeRevision {
         flake_id: Uuid,
-        git_hash: GitHash,
+        git_hash: CommitHash,
     },
-    /// Map an FHS path to a Nix store path
-    MapFhsToStore {
-        fhs_path: PathBuf,
+    /// Analyze flake.lock history
+    AnalyzeFlakeLockHistory {
+        repo_path: PathBuf,
+        limit: Option<usize>,
     },
 }
 
@@ -433,7 +503,7 @@ pub enum GitNixEvent {
     FlakeCreatedFromGit {
         flake_id: Uuid,
         git_url: String,
-        git_hash: GitHash,
+        git_hash: CommitHash,
         store_path: StorePath,
         timestamp: DateTime<Utc>,
     },
@@ -446,14 +516,14 @@ pub enum GitNixEvent {
     /// A flake was pinned to a Git revision
     FlakePinnedToRevision {
         flake_id: Uuid,
-        git_hash: GitHash,
+        git_hash: CommitHash,
         store_path: StorePath,
         timestamp: DateTime<Utc>,
     },
-    /// An FHS path was mapped to a store path
-    FhsMappedToStore {
-        fhs_path: PathBuf,
-        store_path: StorePath,
+    /// Flake.lock history was analyzed
+    FlakeLockHistoryAnalyzed {
+        repo_path: PathBuf,
+        commits: Vec<FlakeLockCommit>,
         timestamp: DateTime<Utc>,
     },
 }
@@ -474,6 +544,10 @@ mod tests {
         let flake_ref = mapper.git_url_to_flake_ref("https://gitlab.com/example/project").unwrap();
         assert_eq!(flake_ref.uri, "gitlab:example/project");
         
+        // Test Sourcehut URL
+        let flake_ref = mapper.git_url_to_flake_ref("https://git.sr.ht/~user/project").unwrap();
+        assert_eq!(flake_ref.uri, "sourcehut:~user/project");
+        
         // Test generic Git URL
         let flake_ref = mapper.git_url_to_flake_ref("https://example.com/repo.git").unwrap();
         assert_eq!(flake_ref.uri, "git+https://example.com/repo.git");
@@ -490,5 +564,9 @@ mod tests {
         // Test with .git suffix
         let result = mapper.parse_forge_url("https://github.com/owner/repo.git");
         assert_eq!(result, Some(("github".to_string(), "owner".to_string(), "repo".to_string())));
+        
+        // Test Sourcehut parsing
+        let result = mapper.parse_forge_url("https://git.sr.ht/~user/project");
+        assert_eq!(result, Some(("sourcehut".to_string(), "~user".to_string(), "project".to_string())));
     }
 } 

@@ -3,185 +3,197 @@
 //! This module contains aggregate roots that maintain consistency
 //! for Nix domain entities.
 
-use crate::{commands::{CreateFlake, AddFlakeInput, CreateModule, CreateOverlay, CreateConfiguration, ActivateConfiguration}, events::{FlakeCreated, FlakeInputAdded, ModuleCreated, OverlayCreated, ConfigurationCreated, ConfigurationActivated}, value_objects::{Flake, FlakeInputs, FlakeOutputs, FlakeRef, NixModule, Overlay, NixOSConfiguration}, Result, NixDomainError};
-use std::collections::HashMap;
+use crate::{
+    commands::{
+        CreateFlake, AddFlakeInput, CreateModule, CreateOverlay,
+        CreateConfiguration, ActivateConfiguration
+    },
+    events::{
+        FlakeCreated, FlakeInputAdded, ModuleCreated, OverlayCreated,
+        ConfigurationCreated, ConfigurationActivated
+    },
+    value_objects::{Flake, NixModule, Overlay, NixOSConfiguration},
+    Result, NixDomainError,
+};
+use cim_domain::AggregateRoot;
 use uuid::Uuid;
 use chrono::Utc;
 
-/// Flake aggregate
+/// Represents a Nix flake aggregate root
 #[derive(Debug, Clone)]
 pub struct FlakeAggregate {
-    /// The flake being managed
-    pub flake: Flake,
+    pub id: Uuid,
+    pub flake: Option<Flake>,
+    pub modules: Vec<NixModule>,
+    pub overlays: Vec<Overlay>,
+    pub created_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+    version: u64,
 }
 
 impl FlakeAggregate {
     /// Create a new flake aggregate
-    #[must_use] pub fn new(flake: Flake) -> Self {
-        Self { flake }
+    pub fn new(id: Uuid) -> Self {
+        let now = Utc::now();
+        Self {
+            id,
+            flake: None,
+            modules: Vec::new(),
+            overlays: Vec::new(),
+            created_at: now,
+            updated_at: now,
+            version: 0,
+        }
     }
 
-    /// Handle create flake command
-    pub fn handle_create_flake(cmd: CreateFlake) -> Result<(Self, Vec<FlakeCreated>)> {
-        let flake = Flake {
-            id: Uuid::new_v4(),
-            path: cmd.path.clone(),
-            description: cmd.description.clone(),
-            inputs: FlakeInputs {
-                inputs: HashMap::new(),
-            },
-            outputs: FlakeOutputs {
-                packages: HashMap::new(),
-                dev_shells: HashMap::new(),
-                nixos_modules: HashMap::new(),
-                overlays: HashMap::new(),
-                apps: HashMap::new(),
-            },
-        };
+    /// Handle a command
+    pub fn handle_command(&mut self, cmd: Box<dyn std::any::Any>) -> Result<Vec<Box<dyn std::any::Any>>> {
+        let mut events = Vec::new();
 
-        let event = FlakeCreated {
-            flake_id: flake.id,
-            path: cmd.path,
-            description: cmd.description,
-            template: cmd.template,
-            timestamp: Utc::now(),
-        };
-
-        Ok((Self::new(flake), vec![event]))
-    }
-
-    /// Handle add flake input command
-    pub fn handle_add_flake_input(&mut self, cmd: AddFlakeInput) -> Result<Vec<FlakeInputAdded>> {
-        // Check if input already exists
-        if self.flake.inputs.inputs.contains_key(&cmd.name) {
-            return Err(NixDomainError::DomainError(
-                format!("Input '{}' already exists", cmd.name)
-            ));
+        if let Some(create_flake) = cmd.downcast_ref::<CreateFlake>() {
+            // Handle create flake command
+            let event = FlakeCreated {
+                flake_id: self.id,
+                path: create_flake.path.clone(),
+                description: create_flake.description.clone(),
+                template: create_flake.template.clone(),
+                timestamp: Utc::now(),
+            };
+            events.push(Box::new(event) as Box<dyn std::any::Any>);
+        } else if let Some(add_input) = cmd.downcast_ref::<AddFlakeInput>() {
+            // Handle add input command
+            let event = FlakeInputAdded {
+                flake_id: self.id,
+                path: add_input.path.clone(),
+                input_name: add_input.name.clone(),
+                input_url: add_input.url.clone(),
+                timestamp: Utc::now(),
+            };
+            events.push(Box::new(event) as Box<dyn std::any::Any>);
+        } else {
+            return Err(NixDomainError::Other("Unknown command".to_string()));
         }
 
-        // Add the input
-        self.flake.inputs.inputs.insert(
-            cmd.name.clone(),
-            FlakeRef::new(cmd.url.clone()),
-        );
-
-        let event = FlakeInputAdded {
-            flake_id: self.flake.id,
-            path: cmd.path,
-            input_name: cmd.name,
-            input_url: cmd.url,
-            timestamp: Utc::now(),
-        };
-
-        Ok(vec![event])
+        Ok(events)
     }
 
-    /// Apply event to update state
-    pub fn apply_event(&mut self, event: &FlakeInputAdded) {
-        self.flake.inputs.inputs.insert(
-            event.input_name.clone(),
-            FlakeRef::new(event.input_url.clone()),
-        );
+    /// Apply an event to the aggregate
+    pub fn apply_event(&mut self, event: &dyn std::any::Any) -> Result<()> {
+        if let Some(flake_created) = event.downcast_ref::<FlakeCreated>() {
+            // Apply flake created event
+            self.id = flake_created.flake_id;
+            self.updated_at = flake_created.timestamp;
+        } else if event.downcast_ref::<FlakeInputAdded>().is_some() {
+            // Apply input added event
+            self.updated_at = Utc::now();
+        }
+
+        Ok(())
     }
 }
 
-/// Module aggregate
+impl AggregateRoot for FlakeAggregate {
+    type Id = uuid::Uuid;
+
+    fn id(&self) -> Self::Id {
+        self.id
+    }
+    
+    fn version(&self) -> u64 {
+        self.version
+    }
+    
+    fn increment_version(&mut self) {
+        self.version += 1;
+    }
+}
+
+/// Represents a Nix module aggregate
 #[derive(Debug, Clone)]
 pub struct ModuleAggregate {
-    /// The module being managed
+    pub id: Uuid,
     pub module: NixModule,
 }
 
 impl ModuleAggregate {
-    /// Create a new module aggregate
-    #[must_use] pub fn new(module: NixModule) -> Self {
-        Self { module }
-    }
-
-    /// Handle create module command
+    /// Create a module
     pub fn handle_create_module(cmd: CreateModule) -> Result<(Self, Vec<ModuleCreated>)> {
-        let module = cmd.module.clone();
-
+        let aggregate = Self {
+            id: cmd.command_id,
+            module: cmd.module.clone(),
+        };
         let event = ModuleCreated {
             event_id: Uuid::new_v4(),
             occurred_at: Utc::now(),
             module: cmd.module,
         };
-
-        Ok((Self::new(module), vec![event]))
+        Ok((aggregate, vec![event]))
     }
 }
 
-/// Overlay aggregate
+/// Represents a Nix overlay aggregate
 #[derive(Debug, Clone)]
 pub struct OverlayAggregate {
-    /// The overlay being managed
+    pub id: Uuid,
     pub overlay: Overlay,
 }
 
 impl OverlayAggregate {
-    /// Create a new overlay aggregate
-    #[must_use] pub fn new(overlay: Overlay) -> Self {
-        Self { overlay }
-    }
-
-    /// Handle create overlay command
+    /// Create an overlay
     pub fn handle_create_overlay(cmd: CreateOverlay) -> Result<(Self, Vec<OverlayCreated>)> {
-        let overlay = cmd.overlay.clone();
-
+        let aggregate = Self {
+            id: cmd.command_id,
+            overlay: cmd.overlay.clone(),
+        };
         let event = OverlayCreated {
             event_id: Uuid::new_v4(),
             occurred_at: Utc::now(),
             overlay: cmd.overlay,
         };
-
-        Ok((Self::new(overlay), vec![event]))
+        Ok((aggregate, vec![event]))
     }
 }
 
-/// Configuration aggregate
+/// Represents a NixOS configuration aggregate
 #[derive(Debug, Clone)]
 pub struct ConfigurationAggregate {
-    /// The configuration being managed
+    pub id: Uuid,
+    pub name: String,
     pub configuration: NixOSConfiguration,
-    /// Current system generation
+    pub is_active: bool,
     pub current_generation: u32,
 }
 
 impl ConfigurationAggregate {
-    /// Create a new configuration aggregate
-    #[must_use] pub fn new(configuration: NixOSConfiguration) -> Self {
-        Self {
-            configuration,
-            current_generation: 0,
-        }
-    }
-
-    /// Handle create configuration command
+    /// Create a configuration
     pub fn handle_create_configuration(cmd: CreateConfiguration) -> Result<(Self, Vec<ConfigurationCreated>)> {
-        let configuration = cmd.configuration.clone();
-
+        let id = Uuid::new_v4();
+        let aggregate = Self {
+            id,
+            name: cmd.name.clone(),
+            configuration: cmd.configuration.clone(),
+            is_active: false,
+            current_generation: 0,
+        };
         let event = ConfigurationCreated {
             event_id: Uuid::new_v4(),
             occurred_at: Utc::now(),
             configuration: cmd.configuration,
         };
-
-        Ok((Self::new(configuration), vec![event]))
+        Ok((aggregate, vec![event]))
     }
 
-    /// Handle activate configuration command
+    /// Activate a configuration
     pub fn handle_activate_configuration(&mut self, cmd: ActivateConfiguration) -> Result<Vec<ConfigurationActivated>> {
+        self.is_active = true;
         self.current_generation += 1;
-
         let event = ConfigurationActivated {
             event_id: Uuid::new_v4(),
             occurred_at: Utc::now(),
-            configuration_id: self.configuration.id,
+            configuration_id: self.id,
             generation: self.current_generation,
             activation_type: cmd.activation_type,
         };
-
         Ok(vec![event])
     }
 } 
