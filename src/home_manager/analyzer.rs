@@ -14,12 +14,14 @@ use crate::parser::{NixParser, ParsedFile, NixExpr};
 use crate::value_objects::NixValue;
 use crate::NixDomainError;
 
+/// Analyzer for Home Manager configurations
 pub struct HomeManagerAnalyzer {
     parser: NixParser,
     config_cache: HashMap<String, HomeConfiguration>,
 }
 
 impl HomeManagerAnalyzer {
+    /// Create a new Home Manager analyzer
     pub fn new() -> Self {
         Self {
             parser: NixParser::new(),
@@ -27,6 +29,7 @@ impl HomeManagerAnalyzer {
         }
     }
 
+    /// Analyze a Home Manager configuration file
     pub async fn analyze_home_config(&mut self, path: &Path) -> Result<HomeAnalysis, NixDomainError> {
         let parsed = self.parser.parse_file(path)?;
         let config = self.extract_home_config(&parsed)?;
@@ -42,6 +45,7 @@ impl HomeManagerAnalyzer {
         Ok(analysis)
     }
 
+    /// Extract Home Manager configuration from a parsed Nix file
     pub fn extract_home_config(&self, parsed: &ParsedFile) -> Result<HomeConfiguration, NixDomainError> {
         let mut config = HomeConfiguration::new();
         
@@ -153,6 +157,7 @@ impl HomeManagerAnalyzer {
         Err(NixDomainError::ParseError("Unable to extract file source".to_string()))
     }
 
+    /// Analyze configured programs for dependencies, complexity, and security
     pub fn analyze_programs(&self, config: &HomeConfiguration) -> Result<Vec<ProgramAnalysis>, NixDomainError> {
         let mut analyses = Vec::new();
         
@@ -170,6 +175,7 @@ impl HomeManagerAnalyzer {
         Ok(analyses)
     }
 
+    /// Analyze configured services for resource usage
     pub fn analyze_services(&self, config: &HomeConfiguration) -> Result<Vec<ServiceAnalysis>, NixDomainError> {
         let mut analyses = Vec::new();
         
@@ -185,6 +191,7 @@ impl HomeManagerAnalyzer {
         Ok(analyses)
     }
 
+    /// Find and analyze dotfile mappings in the configuration
     pub fn find_dotfile_mappings(&self, config: &HomeConfiguration) -> Result<Vec<DotfileInfo>, NixDomainError> {
         let mut dotfiles = Vec::new();
         
@@ -203,6 +210,7 @@ impl HomeManagerAnalyzer {
         Ok(dotfiles)
     }
 
+    /// Detect configuration conflicts and inconsistencies
     pub fn detect_conflicts(&self, config: &HomeConfiguration) -> Result<Vec<ConflictInfo>, NixDomainError> {
         let mut conflicts = Vec::new();
         
@@ -243,6 +251,7 @@ impl HomeManagerAnalyzer {
         Ok(conflicts)
     }
 
+    /// Generate suggestions for improving the configuration
     pub fn generate_suggestions(&self, config: &HomeConfiguration) -> Result<Vec<Suggestion>, NixDomainError> {
         let mut suggestions = Vec::new();
         
@@ -283,6 +292,7 @@ impl HomeManagerAnalyzer {
         Ok(suggestions)
     }
 
+    /// Migrate existing dotfiles to a Home Manager configuration
     pub fn migrate_from_dotfiles(&self, dotfiles_dir: &Path) -> Result<HomeConfiguration, NixDomainError> {
         let mut config = HomeConfiguration::new();
         

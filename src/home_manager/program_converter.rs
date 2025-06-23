@@ -8,11 +8,13 @@ use super::{ProgramConfig, DotfileConverter};
 use super::converter::{GitConverter, VimConverter, ZshConverter, TmuxConverter};
 use crate::NixDomainError;
 
+/// Manages converters for different programs and orchestrates dotfile conversions
 pub struct ProgramConverter {
     converters: HashMap<String, Arc<dyn DotfileConverter>>,
 }
 
 impl ProgramConverter {
+    /// Create a new program converter with built-in converters
     pub fn new() -> Self {
         let mut converters: HashMap<String, Arc<dyn DotfileConverter>> = HashMap::new();
         

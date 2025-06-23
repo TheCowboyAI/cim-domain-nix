@@ -22,12 +22,19 @@ use chrono::Utc;
 /// Represents a Nix flake aggregate root
 #[derive(Debug, Clone)]
 pub struct FlakeAggregate {
+    /// Unique identifier for the flake aggregate
     pub id: Uuid,
+    /// The flake entity, if created
     pub flake: Option<Flake>,
+    /// List of modules associated with this flake
     pub modules: Vec<NixModule>,
+    /// List of overlays associated with this flake
     pub overlays: Vec<Overlay>,
+    /// Timestamp when this aggregate was created
     pub created_at: chrono::DateTime<Utc>,
+    /// Timestamp when this aggregate was last updated
     pub updated_at: chrono::DateTime<Utc>,
+    /// Version number for optimistic concurrency control
     version: u64,
 }
 
@@ -111,7 +118,9 @@ impl AggregateRoot for FlakeAggregate {
 /// Represents a Nix module aggregate
 #[derive(Debug, Clone)]
 pub struct ModuleAggregate {
+    /// Unique identifier for the module aggregate
     pub id: Uuid,
+    /// The module entity
     pub module: NixModule,
 }
 
@@ -134,7 +143,9 @@ impl ModuleAggregate {
 /// Represents a Nix overlay aggregate
 #[derive(Debug, Clone)]
 pub struct OverlayAggregate {
+    /// Unique identifier for the overlay aggregate
     pub id: Uuid,
+    /// The overlay entity
     pub overlay: Overlay,
 }
 
@@ -157,10 +168,15 @@ impl OverlayAggregate {
 /// Represents a NixOS configuration aggregate
 #[derive(Debug, Clone)]
 pub struct ConfigurationAggregate {
+    /// Unique identifier for the configuration aggregate
     pub id: Uuid,
+    /// Name of the configuration
     pub name: String,
+    /// The NixOS configuration entity
     pub configuration: NixOSConfiguration,
+    /// Whether this configuration is currently active
     pub is_active: bool,
+    /// Current generation number (incremented on each activation)
     pub current_generation: u32,
 }
 

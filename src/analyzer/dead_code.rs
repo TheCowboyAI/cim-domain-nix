@@ -151,18 +151,15 @@ impl DeadCodeAnalyzer {
 
     /// Collect let binding definitions
     fn collect_let_bindings(let_node: &SyntaxNode, defined: &mut HashSet<String>) -> Result<()> {
+        // In let expressions, bindings are direct children of NODE_LET_IN
         for child in let_node.children() {
-            let text = child.text().to_string();
-            let trimmed = text.trim();
-            
-            // Look for attribute assignments
-            if trimmed.contains('=') && !trimmed.starts_with('#') {
-                // Extract the key part
-                if let Some(key_part) = trimmed.split('=').next() {
-                    let name = key_part.trim();
-                    // Skip if it's a complex expression
-                    if !name.contains(' ') && !name.contains('.') {
-                        defined.insert(name.to_string());
+            if child.kind() == SyntaxKind::NODE_ATTRPATH_VALUE {
+                // Get the attrpath which contains the identifier
+                if let Some(attrpath) = child.children().find(|n| n.kind() == SyntaxKind::NODE_ATTRPATH) {
+                    // Get the identifier from the attrpath
+                    if let Some(ident) = attrpath.children().find(|n| n.kind() == SyntaxKind::NODE_IDENT) {
+                        let name = ident.text().to_string();
+                        defined.insert(name);
                     }
                 }
             }
@@ -197,25 +194,20 @@ impl DeadCodeAnalyzer {
     /// Check if a node is in a definition context
     fn is_definition_context(node: &SyntaxNode) -> bool {
         if let Some(parent) = node.parent() {
-            match parent.kind() {
-                // Check if parent contains an assignment
-                _ => {
-                    let parent_text = parent.text().to_string();
-                    let node_text = node.text().to_string();
-                    // Check if this identifier appears before an equals sign
-                    if let Some(pos) = parent_text.find(&node_text) {
-                        if let Some(eq_pos) = parent_text[pos..].find('=') {
-                            // Check if there's only whitespace between identifier and equals
-                            let between = &parent_text[pos + node_text.len()..pos + eq_pos];
-                            return between.trim().is_empty();
+            // Check if this identifier is inside an attrpath
+            if parent.kind() == SyntaxKind::NODE_ATTRPATH {
+                // Check if the attrpath is part of an attrpath-value (definition)
+                if let Some(grandparent) = parent.parent() {
+                    if grandparent.kind() == SyntaxKind::NODE_ATTRPATH_VALUE {
+                        // Check if the attrpath is the first child (the key)
+                        if let Some(first_child) = grandparent.children().next() {
+                            return first_child == parent;
                         }
                     }
-                    false
                 }
             }
-        } else {
-            false
         }
+        false
     }
 
     /// Classify the type of symbol
@@ -237,36 +229,42 @@ impl DeadCodeAnalyzer {
     ) -> Result<Vec<DeadCode>> {
         let mut dead_code = Vec::new();
 
-        // Look for code after throw or abort
-        if node.kind() == SyntaxKind::NODE_APPLY {
-            let text = node.text().to_string();
+        // Look for throw or abort in let bindings
+        if node.kind() == SyntaxKind::NODE_LET_IN {
+            let mut found_throw = false;
             
-            if text.contains("throw") || text.contains("abort") {
-                // Check if there's code after this in the same block
-                if let Some(parent) = node.parent() {
-                    let mut found_throw = false;
+            // Check each binding (direct children of NODE_LET_IN)
+            for binding in node.children() {
+                if binding.kind() == SyntaxKind::NODE_ATTRPATH_VALUE {
+                    let binding_text = binding.text().to_string();
                     
-                    for sibling in parent.children() {
-                        if found_throw && sibling.kind() != SyntaxKind::TOKEN_COMMENT {
-                            dead_code.push(DeadCode {
-                                code_type: DeadCodeType::UnreachableCode,
-                                name: "code after throw/abort".to_string(),
-                                file: file.as_ref().map(|p| p.display().to_string()),
-                                line: None,
-                                context: Some("Code after throw/abort is unreachable".to_string()),
-                                suggestion: "Remove unreachable code".to_string(),
-                            });
-                            break;
+                    // If we already found a throw, this binding is unreachable
+                    if found_throw {
+                        // Get the identifier from the attrpath
+                        if let Some(attrpath) = binding.children().find(|n| n.kind() == SyntaxKind::NODE_ATTRPATH) {
+                            if let Some(ident) = attrpath.children().find(|n| n.kind() == SyntaxKind::NODE_IDENT) {
+                                let name = ident.text().to_string();
+                                dead_code.push(DeadCode {
+                                    code_type: DeadCodeType::UnreachableCode,
+                                    name: format!("binding '{}'", name),
+                                    file: file.as_ref().map(|p| p.display().to_string()),
+                                    line: None,
+                                    context: Some("Code after throw/abort is unreachable".to_string()),
+                                    suggestion: "Remove unreachable code".to_string(),
+                                });
+                            }
                         }
-                        if &sibling == node {
-                            found_throw = true;
-                        }
+                    }
+                    
+                    // Check if this binding contains throw or abort
+                    if binding_text.contains("throw") || binding_text.contains("abort") {
+                        found_throw = true;
                     }
                 }
             }
         }
 
-        // Recurse
+        // Recurse into children
         for child in node.children() {
             dead_code.extend(Self::find_unreachable_code(&child, file)?);
         }
@@ -380,8 +378,6 @@ impl DeadCodeAnalyzer {
 mod tests {
     use super::*;
     use petgraph::graph::DiGraph;
-    use std::collections::HashMap;
-    use std::path::PathBuf;
 
     #[test]
     fn test_detect_unused_variable() {
@@ -395,6 +391,12 @@ mod tests {
         let file = NixFile::parse_string(content.to_string(), None).unwrap();
         let graph = DiGraph::new();
         let dead_code = DeadCodeAnalyzer::analyze(&[file], &graph).unwrap();
+
+        // Debug: print what we found
+        eprintln!("Found {} dead code items:", dead_code.len());
+        for dc in &dead_code {
+            eprintln!("  - Type: {:?}, Name: {}", dc.code_type, dc.name);
+        }
 
         assert!(dead_code.iter().any(|d| {
             d.code_type == DeadCodeType::UnusedVariable && d.name == "unused"

@@ -59,6 +59,12 @@ impl FlakeRef {
     }
 }
 
+impl std::fmt::Display for FlakeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_nix_string())
+    }
+}
+
 /// An attribute path in Nix (e.g., "packages.x86_64-linux.hello")
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttributePath {

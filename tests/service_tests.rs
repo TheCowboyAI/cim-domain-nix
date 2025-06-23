@@ -46,6 +46,19 @@ async fn test_development_service_add_dependency() {
         "Test project".to_string(),
     ).await.unwrap();
 
+    // Initialize git repo and add flake.nix
+    std::process::Command::new("git")
+        .args(&["init"])
+        .current_dir(&project_path)
+        .output()
+        .expect("Failed to init git repo");
+
+    std::process::Command::new("git")
+        .args(&["add", "flake.nix"])
+        .current_dir(&project_path)
+        .output()
+        .expect("Failed to add flake.nix");
+
     // Then add a dependency
     let result = dev_service.add_dependency(
         project_path.clone(),
@@ -53,6 +66,10 @@ async fn test_development_service_add_dependency() {
         "github:NixOS/nixpkgs".to_string(),
     ).await;
 
+    match &result {
+        Err(e) => eprintln!("Error adding dependency: {:?}", e),
+        _ => {}
+    }
     assert!(result.is_ok());
 }
 

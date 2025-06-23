@@ -11,6 +11,8 @@ async fn test_analyzer_detects_security_issues() {
         max_files: Some(10),
         follow_symlinks: false,
         ignore_patterns: vec![".git".to_string()],
+        check_formatting: false,
+        formatter: None,
     };
     
     let mut analyzer = NixAnalyzer::with_config(config);

@@ -23,6 +23,7 @@ pub trait DotfileConverter: Send + Sync {
 pub struct GitConverter;
 
 impl GitConverter {
+    /// Create a new Git converter
     pub fn new() -> Self {
         Self
     }
@@ -99,6 +100,7 @@ impl DotfileConverter for GitConverter {
 pub struct VimConverter;
 
 impl VimConverter {
+    /// Create a new Vim converter
     pub fn new() -> Self {
         Self
     }
@@ -152,6 +154,7 @@ impl DotfileConverter for VimConverter {
 pub struct ZshConverter;
 
 impl ZshConverter {
+    /// Create a new Zsh converter
     pub fn new() -> Self {
         Self
     }
@@ -229,6 +232,7 @@ impl DotfileConverter for ZshConverter {
 pub struct TmuxConverter;
 
 impl TmuxConverter {
+    /// Create a new Tmux converter
     pub fn new() -> Self {
         Self
     }

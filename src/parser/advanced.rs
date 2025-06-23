@@ -16,6 +16,7 @@ pub struct AdvancedParser {
 }
 
 impl AdvancedParser {
+    /// Create a new advanced parser
     pub fn new() -> Self {
         Self {
             current_file: None,

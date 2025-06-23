@@ -244,16 +244,19 @@ impl Default for ParserConfig {
 /// Simple parser for basic Nix expressions
 #[derive(Debug, Clone)]
 pub struct NixParser {
+    /// Parser configuration
     config: ParserConfig,
 }
 
 impl NixParser {
+    /// Create a new parser with default configuration
     pub fn new() -> Self {
         Self {
             config: ParserConfig::default(),
         }
     }
     
+    /// Parse a Nix file from disk
     pub fn parse_file(&self, path: &Path) -> Result<ParsedFile> {
         let nix_file = NixFile::parse_file(path)?;
         Ok(ParsedFile {
@@ -263,6 +266,7 @@ impl NixParser {
         })
     }
     
+    /// Parse Nix content from a string
     pub fn parse_string(&self, content: &str) -> Result<ParsedFile> {
         let nix_file = NixFile::parse_string(content.to_string(), None)?;
         Ok(ParsedFile {
@@ -276,8 +280,11 @@ impl NixParser {
 /// A parsed file with its expression tree
 #[derive(Debug, Clone)]
 pub struct ParsedFile {
+    /// Path to the file (empty for strings)
     pub path: PathBuf,
+    /// The parsed expression
     pub expr: NixExpr,
+    /// Any parse errors encountered
     pub errors: Vec<ParseError>,
 }
 

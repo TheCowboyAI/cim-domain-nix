@@ -105,11 +105,34 @@ impl PerformanceAnalyzer {
     ) -> Result<Vec<PerformanceIssue>> {
         let mut issues = Vec::new();
 
-        // Look for import expressions that reference derivations
+        // Look for import expressions
         if node.kind() == SyntaxKind::NODE_APPLY {
             let text = node.text().to_string();
             
-            if text.contains("import") && Self::contains_derivation(node) {
+            // Check if this is an import call
+            if text.contains("import") {
+                // Check if the import argument contains derivation-related functions
+                for child in node.children() {
+                    if Self::contains_derivation(&child) {
+                        issues.push(PerformanceIssue {
+                            issue_type: PerformanceIssueType::ImportFromDerivation,
+                            impact: ImpactLevel::High,
+                            description: "Import from derivation (IFD) forces evaluation during build".to_string(),
+                            file: file.as_ref().map(|p| p.display().to_string()),
+                            line: None,
+                            cost_estimate: Some("Can add minutes to evaluation time".to_string()),
+                            suggestion: Some("Pre-build and commit the imported file, or use a different approach".to_string()),
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Also check for parenthesized expressions that might contain import + derivation
+        if node.kind() == SyntaxKind::NODE_PAREN {
+            let text = node.text().to_string();
+            if text.contains("import") && text.contains("runCommand") {
                 issues.push(PerformanceIssue {
                     issue_type: PerformanceIssueType::ImportFromDerivation,
                     impact: ImpactLevel::High,
@@ -339,7 +362,10 @@ impl PerformanceAnalyzer {
         let text = node.text().to_string();
         text.contains("mkDerivation") || 
         text.contains("buildPackage") ||
-        text.contains("stdenv.mkDerivation")
+        text.contains("stdenv.mkDerivation") ||
+        text.contains("runCommand") ||
+        text.contains("writeText") ||
+        text.contains("writeFile")
     }
 
     /// Helper: Measure recursion depth

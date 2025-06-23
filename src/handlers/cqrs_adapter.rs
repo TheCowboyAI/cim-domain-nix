@@ -14,8 +14,11 @@ use std::sync::Arc;
 /// Wrapper for Nix commands to implement CQRS Command trait
 #[derive(Debug, Clone)]
 pub enum NixCommandWrapper {
+    /// Create a new flake
     CreateFlake(CreateFlake),
+    /// Update an existing flake
     UpdateFlake(UpdateFlake),
+    /// Build a package from a flake
     BuildPackage(BuildPackage),
 }
 
@@ -37,6 +40,7 @@ pub struct CreateFlakeHandler {
 }
 
 impl CreateFlakeHandler {
+    /// Create a new CreateFlake handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
         Self {
             nix_handler,
@@ -63,6 +67,7 @@ pub struct UpdateFlakeHandler {
 }
 
 impl UpdateFlakeHandler {
+    /// Create a new UpdateFlake handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
         Self {
             nix_handler,
@@ -88,6 +93,7 @@ pub struct BuildPackageHandler {
 }
 
 impl BuildPackageHandler {
+    /// Create a new BuildPackage handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
         Self {
             nix_handler,

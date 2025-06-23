@@ -48,7 +48,7 @@ pub struct GitRepository {
     pub default_branch: BranchName,
 }
 
-/// Represents a Nix input that comes from Git
+/// Represents a Git-backed flake input
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitFlakeInput {
     /// The input name
@@ -167,7 +167,8 @@ impl GitNixMapper {
                 .collect();
             
             if parts.len() >= 2 {
-                return Some(("sourcehut".to_string(), format!("~{}", parts[0]), parts[1].to_string()));
+                // Don't add extra tilde - it's already in the template
+                return Some(("sourcehut".to_string(), parts[0].to_string(), parts[1].to_string()));
             }
         }
         
@@ -476,22 +477,30 @@ pub struct DependencyChanges {
 pub enum GitNixCommand {
     /// Create a flake from a Git repository
     CreateFlakeFromGit {
+        /// Git repository URL
         git_url: String,
+        /// Local path where the flake will be created
         target_path: PathBuf,
+        /// Human-readable description of the flake
         description: String,
     },
     /// Update flake inputs from Git
     UpdateGitInputs {
+        /// ID of the flake to update
         flake_id: Uuid,
     },
     /// Pin a flake to a specific Git revision
     PinFlakeRevision {
+        /// ID of the flake to pin
         flake_id: Uuid,
+        /// Git commit hash to pin to
         git_hash: CommitHash,
     },
     /// Analyze flake.lock history
     AnalyzeFlakeLockHistory {
+        /// Path to the Git repository
         repo_path: PathBuf,
+        /// Maximum number of commits to analyze
         limit: Option<usize>,
     },
 }
@@ -501,29 +510,44 @@ pub enum GitNixCommand {
 pub enum GitNixEvent {
     /// A flake was created from a Git repository
     FlakeCreatedFromGit {
+        /// ID of the created flake
         flake_id: Uuid,
+        /// Git repository URL
         git_url: String,
+        /// Git commit hash at creation time
         git_hash: CommitHash,
+        /// Nix store path of the flake
         store_path: StorePath,
+        /// When the event occurred
         timestamp: DateTime<Utc>,
     },
     /// Git inputs were updated
     GitInputsUpdated {
+        /// ID of the flake that was updated
         flake_id: Uuid,
+        /// Updated list of inputs
         inputs: Vec<GitFlakeInput>,
+        /// When the event occurred
         timestamp: DateTime<Utc>,
     },
     /// A flake was pinned to a Git revision
     FlakePinnedToRevision {
+        /// ID of the pinned flake
         flake_id: Uuid,
+        /// Git commit hash it was pinned to
         git_hash: CommitHash,
+        /// Nix store path of the pinned version
         store_path: StorePath,
+        /// When the event occurred
         timestamp: DateTime<Utc>,
     },
     /// Flake.lock history was analyzed
     FlakeLockHistoryAnalyzed {
+        /// Path to the analyzed repository
         repo_path: PathBuf,
+        /// List of commits that modified flake.lock
         commits: Vec<FlakeLockCommit>,
+        /// When the event occurred
         timestamp: DateTime<Utc>,
     },
 }
@@ -567,6 +591,6 @@ mod tests {
         
         // Test Sourcehut parsing
         let result = mapper.parse_forge_url("https://git.sr.ht/~user/project");
-        assert_eq!(result, Some(("sourcehut".to_string(), "~user".to_string(), "project".to_string())));
+        assert_eq!(result, Some(("sourcehut".to_string(), "user".to_string(), "project".to_string())));
     }
 } 

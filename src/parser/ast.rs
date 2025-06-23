@@ -4,6 +4,7 @@ use rnix::{SyntaxNode, SyntaxKind};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
+use thiserror::Error;
 
 /// Represents a parsed Nix expression with full AST information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,7 +32,9 @@ pub enum NixAst {
     
     /// Attribute set
     AttrSet {
+        /// Whether this is a recursive attribute set (rec { ... })
         recursive: bool,
+        /// The bindings within the attribute set
         bindings: Vec<Binding>,
     },
     
@@ -40,64 +43,87 @@ pub enum NixAst {
     
     /// Function (lambda)
     Function {
+        /// The function parameter pattern
         param: FunctionParam,
+        /// The function body expression
         body: Box<NixAst>,
     },
     
     /// Function application
     Apply {
+        /// The function being applied
         function: Box<NixAst>,
+        /// The argument being passed to the function
         argument: Box<NixAst>,
     },
     
     /// Let expression
     Let {
+        /// The bindings introduced by the let
         bindings: Vec<Binding>,
+        /// The body expression where bindings are in scope
         body: Box<NixAst>,
     },
     
     /// If expression
     If {
+        /// The condition to evaluate
         condition: Box<NixAst>,
+        /// Expression to evaluate if condition is true
         then_branch: Box<NixAst>,
+        /// Expression to evaluate if condition is false
         else_branch: Box<NixAst>,
     },
     
     /// With expression
     With {
+        /// The namespace to bring into scope
         namespace: Box<NixAst>,
+        /// The body where the namespace is available
         body: Box<NixAst>,
     },
     
     /// Assert expression
     Assert {
+        /// The condition that must be true
         condition: Box<NixAst>,
+        /// The body to evaluate if assertion passes
         body: Box<NixAst>,
     },
     
     /// Binary operation
     BinaryOp {
+        /// The binary operator
         op: BinaryOperator,
+        /// The left operand
         left: Box<NixAst>,
+        /// The right operand
         right: Box<NixAst>,
     },
     
     /// Unary operation
     UnaryOp {
+        /// The unary operator
         op: UnaryOperator,
+        /// The operand
         operand: Box<NixAst>,
     },
     
     /// Attribute selection (a.b)
     Select {
+        /// The expression to select from
         expr: Box<NixAst>,
+        /// The attribute path to select
         attr_path: AttrPath,
+        /// Optional default value if attribute doesn't exist
         default: Option<Box<NixAst>>,
     },
     
     /// Has attribute (a ? b)
     HasAttr {
+        /// The expression to check
         expr: Box<NixAst>,
+        /// The attribute path to check for
         attr_path: AttrPath,
     },
     
@@ -106,7 +132,9 @@ pub enum NixAst {
     
     /// Inherit expression (for use in bindings)
     Inherit {
+        /// Optional expression to inherit from
         from: Option<Box<NixAst>>,
+        /// Attributes to inherit
         attrs: Vec<String>,
     },
 }
@@ -119,8 +147,11 @@ pub enum FunctionParam {
     
     /// Pattern parameter with optional fields
     Pattern {
+        /// The fields in the pattern
         fields: Vec<PatternField>,
+        /// Optional identifier to bind the whole argument to
         bind: Option<String>,
+        /// Whether the pattern has an ellipsis (...)
         ellipsis: bool,
     },
 }
@@ -128,13 +159,16 @@ pub enum FunctionParam {
 /// Field in a function pattern
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatternField {
+    /// The field name
     pub name: String,
+    /// Optional default value for the field
     pub default: Option<NixAst>,
 }
 
 /// Attribute path (a.b.c)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttrPath {
+    /// The segments of the path
     pub segments: Vec<AttrPathSegment>,
 }
 
@@ -151,7 +185,9 @@ pub enum AttrPathSegment {
 /// Binding in an attribute set or let expression
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Binding {
+    /// The attribute path being bound
     pub attr_path: AttrPath,
+    /// The value being bound
     pub value: BindingValue,
 }
 
@@ -163,7 +199,9 @@ pub enum BindingValue {
     
     /// Inherit binding
     Inherit {
+        /// Optional expression to inherit from
         from: Option<NixAst>,
+        /// Attributes to inherit
         attrs: Vec<String>,
     },
 }
@@ -172,52 +210,76 @@ pub enum BindingValue {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BinaryOperator {
     // Arithmetic
+    /// Addition operator (+)
     Add,
+    /// Subtraction operator (-)
     Subtract,
+    /// Multiplication operator (*)
     Multiply,
+    /// Division operator (/)
     Divide,
     
     // Comparison
+    /// Equality operator (==)
     Equal,
+    /// Inequality operator (!=)
     NotEqual,
+    /// Less than operator (<)
     Less,
+    /// Less than or equal operator (<=)
     LessEqual,
+    /// Greater than operator (>)
     Greater,
+    /// Greater than or equal operator (>=)
     GreaterEqual,
     
     // Logical
+    /// Logical AND operator (&&)
     And,
+    /// Logical OR operator (||)
     Or,
+    /// Logical implication operator (->)
     Implies,
     
     // List
+    /// List concatenation operator (++)
     Concat,
     
     // Attribute set
+    /// Attribute set update operator (//)
     Update,
 }
 
 /// Unary operators
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UnaryOperator {
+    /// Logical NOT operator (!)
     Not,
+    /// Arithmetic negation operator (-)
     Negate,
 }
 
 /// Location information for AST nodes
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Location {
+    /// The file this node comes from
     pub file: Option<PathBuf>,
+    /// Line number (1-based)
     pub line: usize,
+    /// Column number (1-based)
     pub column: usize,
+    /// Byte offset in the file
     pub offset: usize,
+    /// Length in bytes
     pub length: usize,
 }
 
 /// AST node with location information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocatedAst {
+    /// The AST node
     pub ast: NixAst,
+    /// Location information
     pub location: Location,
 }
 
@@ -523,14 +585,18 @@ fn parse_import(node: &SyntaxNode) -> Result<NixAst, AstError> {
     Err(AstError::InvalidStructure("Import missing expression".to_string()))
 }
 
-#[derive(Debug, thiserror::Error)]
+/// Errors that can occur during AST parsing
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum AstError {
+    /// An unsupported node type was encountered
     #[error("Unsupported node type: {0}")]
     UnsupportedNode(String),
     
+    /// The node structure was invalid or unexpected
     #[error("Invalid node structure: {0}")]
     InvalidStructure(String),
     
+    /// An error occurred while parsing a value
     #[error("Parse error: {0}")]
     ParseError(String),
 }
