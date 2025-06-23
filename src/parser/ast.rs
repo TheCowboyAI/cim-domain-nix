@@ -422,7 +422,18 @@ pub fn from_syntax_node(node: &SyntaxNode) -> Result<NixAst, AstError> {
         SyntaxKind::NODE_ATTR_SET => parse_attr_set(node),
         SyntaxKind::NODE_LIST => parse_list(node),
         SyntaxKind::NODE_LAMBDA => parse_function(node),
-        SyntaxKind::NODE_APPLY => parse_apply(node),
+        SyntaxKind::NODE_APPLY => {
+            // Check if this is an import expression
+            let children: Vec<_> = node.children().collect();
+            if !children.is_empty() {
+                if let Ok(NixAst::Identifier(name)) = from_syntax_node(&children[0]) {
+                    if name == "import" && children.len() > 1 {
+                        return Ok(NixAst::Import(Box::new(from_syntax_node(&children[1])?)));
+                    }
+                }
+            }
+            parse_apply(node)
+        }
         SyntaxKind::NODE_LET_IN => parse_let(node),
         SyntaxKind::NODE_IF_ELSE => parse_if(node),
         SyntaxKind::NODE_WITH => parse_with(node),
@@ -431,8 +442,85 @@ pub fn from_syntax_node(node: &SyntaxNode) -> Result<NixAst, AstError> {
         SyntaxKind::NODE_UNARY_OP => parse_unary_op(node),
         SyntaxKind::NODE_SELECT => parse_select(node),
         SyntaxKind::NODE_HAS_ATTR => parse_has_attr(node),
-        _ => Err(AstError::UnsupportedNode(format!("{:?}", node.kind()))),
+        SyntaxKind::NODE_STRING => parse_string(node),
+        SyntaxKind::NODE_PATH => parse_path(node),
+        SyntaxKind::NODE_PAREN => parse_paren(node),
+        SyntaxKind::NODE_ROOT => parse_root(node),
+        SyntaxKind::NODE_INHERIT => {
+            // Inherit nodes are handled within attr sets, but if we encounter one directly,
+            // we can return a placeholder
+            Err(AstError::InvalidStructure("Inherit must be inside an attribute set".to_string()))
+        }
+        // Handle tokens that might appear as direct children
+        SyntaxKind::TOKEN_INTEGER => {
+            let text = node.text().to_string();
+            let value = text.parse::<i64>()
+                .map_err(|e| AstError::ParseError(format!("Invalid integer: {}", e)))?;
+            Ok(NixAst::Integer(value))
+        }
+        SyntaxKind::TOKEN_FLOAT => {
+            let text = node.text().to_string();
+            let value = text.parse::<f64>()
+                .map_err(|e| AstError::ParseError(format!("Invalid float: {}", e)))?;
+            Ok(NixAst::Float(value))
+        }
+        _ => {
+            // Check if it's a boolean or null identifier
+            let text = node.text().to_string();
+            match text.as_str() {
+                "true" => Ok(NixAst::Bool(true)),
+                "false" => Ok(NixAst::Bool(false)),
+                "null" => Ok(NixAst::Null),
+                _ => {
+                    // Try to find a child that we can parse
+                    for child in node.children() {
+                        if let Ok(ast) = from_syntax_node(&child) {
+                            return Ok(ast);
+                        }
+                    }
+                    
+                    Err(AstError::UnsupportedNode(format!("Unsupported node kind: {:?}", node.kind())))
+                }
+            }
+        }
     }
+}
+
+fn parse_paren(node: &SyntaxNode) -> Result<NixAst, AstError> {
+    // Parentheses just wrap an expression, so we parse the inner expression
+    node.children()
+        .next()
+        .ok_or_else(|| AstError::InvalidStructure("Empty parentheses".to_string()))
+        .and_then(|child| from_syntax_node(&child))
+}
+
+fn parse_root(node: &SyntaxNode) -> Result<NixAst, AstError> {
+    // The root node contains the top-level expression
+    node.children()
+        .next()
+        .ok_or_else(|| AstError::InvalidStructure("Empty root node".to_string()))
+        .and_then(|child| from_syntax_node(&child))
+}
+
+fn parse_import(node: &SyntaxNode) -> Result<NixAst, AstError> {
+    // Import expressions have the form: import <expr>
+    // Find the expression after the import keyword
+    let mut found_import = false;
+    for child in node.children() {
+        if found_import {
+            return Ok(NixAst::Import(Box::new(from_syntax_node(&child)?)));
+        }
+        if child.text().to_string().trim() == "import" {
+            found_import = true;
+        }
+    }
+    
+    // If we have children, try to parse the first one as the import expression
+    if let Some(child) = node.children().next() {
+        return Ok(NixAst::Import(Box::new(from_syntax_node(&child)?)));
+    }
+    
+    Err(AstError::InvalidStructure("Import missing expression".to_string()))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -447,74 +535,617 @@ pub enum AstError {
     ParseError(String),
 }
 
-// Placeholder implementations for parsing functions
 fn parse_literal(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement literal parsing
-    Err(AstError::UnsupportedNode("literal parsing not implemented".to_string()))
+    // Handle different types of literals based on the first token
+    if let Some(token) = node.first_token() {
+        match token.kind() {
+            SyntaxKind::TOKEN_INTEGER => {
+                let text = token.text().to_string();
+                let value = text.parse::<i64>()
+                    .map_err(|e| AstError::ParseError(format!("Invalid integer: {}", e)))?;
+                Ok(NixAst::Integer(value))
+            }
+            SyntaxKind::TOKEN_FLOAT => {
+                let text = token.text().to_string();
+                let value = text.parse::<f64>()
+                    .map_err(|e| AstError::ParseError(format!("Invalid float: {}", e)))?;
+                Ok(NixAst::Float(value))
+            }
+            _ => {
+                // Check children for other literal types
+                for child in node.children() {
+                    match child.kind() {
+                        SyntaxKind::NODE_STRING => return parse_string(&child),
+                        SyntaxKind::NODE_PATH => return parse_path(&child),
+                        _ => {}
+                    }
+                }
+                
+                // Check if it's a boolean or null by text
+                let text = node.text().to_string();
+                match text.as_str() {
+                    "true" => Ok(NixAst::Bool(true)),
+                    "false" => Ok(NixAst::Bool(false)),
+                    "null" => Ok(NixAst::Null),
+                    _ => Err(AstError::UnsupportedNode(format!("Unknown literal: {:?}", node.kind())))
+                }
+            }
+        }
+    } else {
+        Err(AstError::InvalidStructure("Literal node has no tokens".to_string()))
+    }
+}
+
+fn parse_string(node: &SyntaxNode) -> Result<NixAst, AstError> {
+    let mut content = String::new();
+    
+    // In rnix, string content is stored in tokens
+    for token in node.children_with_tokens() {
+        if let Some(token) = token.as_token() {
+            match token.kind() {
+                SyntaxKind::TOKEN_STRING_CONTENT => {
+                    content.push_str(&token.text());
+                }
+                _ => {} // Ignore string delimiters and other tokens
+            }
+        }
+    }
+    
+    // If no content tokens found, try to extract from the text directly
+    if content.is_empty() {
+        let text = node.text().to_string();
+        // Remove quotes if present
+        if text.starts_with('"') && text.ends_with('"') && text.len() > 1 {
+            content = text[1..text.len()-1].to_string();
+        } else if text.starts_with("''") && text.ends_with("''") && text.len() > 3 {
+            // Handle multiline strings
+            content = text[2..text.len()-2].to_string();
+        } else {
+            content = text;
+        }
+    }
+    
+    Ok(NixAst::String(content))
+}
+
+fn parse_path(node: &SyntaxNode) -> Result<NixAst, AstError> {
+    let path_text = node.text().to_string();
+    Ok(NixAst::Path(PathBuf::from(path_text)))
 }
 
 fn parse_identifier(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    Ok(NixAst::Identifier(node.text().to_string()))
+    let text = node.text().to_string();
+    // Check for keywords that should be parsed as literals
+    match text.as_str() {
+        "true" => Ok(NixAst::Bool(true)),
+        "false" => Ok(NixAst::Bool(false)),
+        "null" => Ok(NixAst::Null),
+        _ => Ok(NixAst::Identifier(text)),
+    }
 }
 
 fn parse_attr_set(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement attribute set parsing
-    Err(AstError::UnsupportedNode("attr set parsing not implemented".to_string()))
+    let mut bindings = Vec::new();
+    let mut recursive = false;
+    
+    // Check if it's a recursive attribute set by looking for 'rec' keyword
+    for token in node.children_with_tokens() {
+        if let Some(token) = token.as_token() {
+            if token.kind() == SyntaxKind::TOKEN_REC {
+                recursive = true;
+                break;
+            }
+        }
+    }
+    
+    // Parse all bindings
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::NODE_ATTRPATH_VALUE => {
+                if let Ok(binding) = parse_binding(&child) {
+                    bindings.push(binding);
+                }
+            }
+            SyntaxKind::NODE_INHERIT => {
+                if let Ok(inherit_bindings) = parse_inherit(&child) {
+                    bindings.extend(inherit_bindings);
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    Ok(NixAst::AttrSet { recursive, bindings })
+}
+
+fn parse_binding(node: &SyntaxNode) -> Result<Binding, AstError> {
+    let mut attr_path = None;
+    let mut value_node = None;
+    
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::NODE_ATTRPATH => {
+                attr_path = Some(parse_attr_path(&child)?);
+            }
+            _ => {
+                // The value is any other node after the attr path
+                if attr_path.is_some() && value_node.is_none() {
+                    value_node = Some(child);
+                }
+            }
+        }
+    }
+    
+    let attr_path = attr_path
+        .ok_or_else(|| AstError::InvalidStructure("Binding missing attribute path".to_string()))?;
+    let value_node = value_node
+        .ok_or_else(|| AstError::InvalidStructure("Binding missing value".to_string()))?;
+    
+    let value = from_syntax_node(&value_node)?;
+    
+    Ok(Binding {
+        attr_path,
+        value: BindingValue::Value(value),
+    })
+}
+
+fn parse_attr_path(node: &SyntaxNode) -> Result<AttrPath, AstError> {
+    let mut segments = Vec::new();
+    
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::NODE_IDENT => {
+                segments.push(AttrPathSegment::Identifier(child.text().to_string()));
+            }
+            SyntaxKind::NODE_STRING => {
+                // String literals in attribute paths
+                if let Ok(NixAst::String(s)) = parse_string(&child) {
+                    segments.push(AttrPathSegment::Identifier(s));
+                }
+            }
+            SyntaxKind::NODE_DYNAMIC => {
+                let expr = parse_dynamic(&child)?;
+                segments.push(AttrPathSegment::Dynamic(expr));
+            }
+            _ => {}
+        }
+    }
+    
+    if segments.is_empty() {
+        Err(AstError::InvalidStructure("Empty attribute path".to_string()))
+    } else {
+        Ok(AttrPath { segments })
+    }
+}
+
+fn parse_dynamic(node: &SyntaxNode) -> Result<NixAst, AstError> {
+    // Dynamic attributes are wrapped in ${}, parse the expression inside
+    node.children()
+        .next()
+        .ok_or_else(|| AstError::InvalidStructure("Empty dynamic attribute".to_string()))
+        .and_then(|child| from_syntax_node(&child))
+}
+
+fn parse_inherit(node: &SyntaxNode) -> Result<Vec<Binding>, AstError> {
+    let mut bindings = Vec::new();
+    let mut from_expr = None;
+    let mut attrs = Vec::new();
+    
+    // First pass: find the from expression if any
+    for child in node.children() {
+        if child.kind() == SyntaxKind::NODE_INHERIT_FROM {
+            // The from expression is inside this node
+            if let Some(expr_node) = child.children().next() {
+                from_expr = Some(Box::new(from_syntax_node(&expr_node)?));
+            }
+            break; // Only one from expression allowed
+        }
+    }
+    
+    // Second pass: collect all identifiers that are not inside NODE_INHERIT_FROM
+    for child in node.children() {
+        if child.kind() == SyntaxKind::NODE_IDENT {
+            attrs.push(child.text().to_string());
+        }
+    }
+    
+    // Create individual bindings for each inherited attribute
+    for attr in &attrs {
+        let binding = Binding {
+            attr_path: AttrPath {
+                segments: vec![AttrPathSegment::Identifier(attr.clone())],
+            },
+            value: BindingValue::Inherit {
+                from: from_expr.as_ref().map(|e| (**e).clone()),
+                attrs: vec![attr.clone()],
+            },
+        };
+        bindings.push(binding);
+    }
+    
+    Ok(bindings)
 }
 
 fn parse_list(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement list parsing
-    Err(AstError::UnsupportedNode("list parsing not implemented".to_string()))
+    let mut elements = Vec::new();
+    
+    for child in node.children() {
+        // Skip whitespace and other trivia
+        match from_syntax_node(&child) {
+            Ok(elem) => elements.push(elem),
+            Err(_) => {} // Skip unparseable elements
+        }
+    }
+    
+    Ok(NixAst::List(elements))
 }
 
 fn parse_function(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement function parsing
-    Err(AstError::UnsupportedNode("function parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.is_empty() {
+        return Err(AstError::InvalidStructure("Function has no children".to_string()));
+    }
+    
+    let param = match children[0].kind() {
+        SyntaxKind::NODE_IDENT | SyntaxKind::NODE_IDENT_PARAM => {
+            FunctionParam::Identifier(children[0].text().to_string())
+        }
+        SyntaxKind::NODE_PATTERN => {
+            parse_pattern(&children[0])?
+        }
+        _ => {
+            return Err(AstError::InvalidStructure("Invalid function parameter".to_string()));
+        }
+    };
+    
+    // The body is the last child (after the parameter)
+    let body = children.get(1)
+        .ok_or_else(|| AstError::InvalidStructure("Function missing body".to_string()))?;
+    
+    Ok(NixAst::Function {
+        param,
+        body: Box::new(from_syntax_node(body)?),
+    })
+}
+
+fn parse_pattern(node: &SyntaxNode) -> Result<FunctionParam, AstError> {
+    let mut fields = Vec::new();
+    let mut bind = None;
+    let mut ellipsis = false;
+    
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::NODE_PAT_ENTRY => {
+                if let Ok(field) = parse_pattern_field(&child) {
+                    fields.push(field);
+                }
+            }
+            SyntaxKind::NODE_PAT_BIND => {
+                // The bind is usually after an @ symbol
+                if let Some(ident) = child.children().find(|c| c.kind() == SyntaxKind::NODE_IDENT) {
+                    bind = Some(ident.text().to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    // Check for ellipsis token
+    for token in node.children_with_tokens() {
+        if let Some(token) = token.as_token() {
+            if token.kind() == SyntaxKind::TOKEN_ELLIPSIS {
+                ellipsis = true;
+            }
+        }
+    }
+    
+    Ok(FunctionParam::Pattern { fields, bind, ellipsis })
+}
+
+fn parse_pattern_field(node: &SyntaxNode) -> Result<PatternField, AstError> {
+    let children: Vec<_> = node.children().collect();
+    
+    if children.is_empty() {
+        return Err(AstError::InvalidStructure("Pattern field has no children".to_string()));
+    }
+    
+    let name = match children[0].kind() {
+        SyntaxKind::NODE_IDENT => children[0].text().to_string(),
+        _ => return Err(AstError::InvalidStructure("Pattern field missing name".to_string())),
+    };
+    
+    // Check if there's a default value (after a ? token)
+    let default = if children.len() > 1 {
+        Some(from_syntax_node(&children[1])?)
+    } else {
+        None
+    };
+    
+    Ok(PatternField { name, default })
 }
 
 fn parse_apply(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement application parsing
-    Err(AstError::UnsupportedNode("apply parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.len() < 2 {
+        return Err(AstError::InvalidStructure("Apply needs at least 2 children".to_string()));
+    }
+    
+    let function = from_syntax_node(&children[0])?;
+    let argument = from_syntax_node(&children[1])?;
+    
+    Ok(NixAst::Apply {
+        function: Box::new(function),
+        argument: Box::new(argument),
+    })
 }
 
 fn parse_let(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement let parsing
-    Err(AstError::UnsupportedNode("let parsing not implemented".to_string()))
+    let mut bindings = Vec::new();
+    let mut body = None;
+    let mut found_in = false;
+    
+    // Parse children to find bindings and body
+    for child in node.children() {
+        // Check if we've hit the 'in' keyword area
+        if !found_in {
+            match child.kind() {
+                SyntaxKind::NODE_ATTRPATH_VALUE => {
+                    if let Ok(binding) = parse_binding(&child) {
+                        bindings.push(binding);
+                    }
+                }
+                SyntaxKind::NODE_INHERIT => {
+                    if let Ok(inherit_bindings) = parse_inherit(&child) {
+                        bindings.extend(inherit_bindings);
+                    }
+                }
+                _ => {
+                    // This might be the body after 'in'
+                    // Check tokens to see if we've passed 'in'
+                    for token in node.children_with_tokens() {
+                        if let Some(token) = token.as_token() {
+                            if token.text() == "in" {
+                                found_in = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // If we found 'in', this child might be the body
+                    if found_in {
+                        body = Some(child);
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Everything after 'in' is the body
+            body = Some(child);
+            break;
+        }
+    }
+    
+    // If we didn't find a body explicitly, the last child might be it
+    if body.is_none() {
+        let children: Vec<_> = node.children().collect();
+        if let Some(last) = children.last() {
+            // Check if the last child is not a binding
+            if !matches!(last.kind(), SyntaxKind::NODE_ATTRPATH_VALUE | SyntaxKind::NODE_INHERIT) {
+                body = Some(last.clone());
+            }
+        }
+    }
+    
+    let body = body
+        .ok_or_else(|| AstError::InvalidStructure("Let expression missing body".to_string()))?;
+    
+    Ok(NixAst::Let {
+        bindings,
+        body: Box::new(from_syntax_node(&body)?),
+    })
 }
 
 fn parse_if(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement if parsing
-    Err(AstError::UnsupportedNode("if parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.len() < 3 {
+        return Err(AstError::InvalidStructure("If expression needs condition, then, and else parts".to_string()));
+    }
+    
+    // The structure is: condition, then expression, else expression
+    let condition = from_syntax_node(&children[0])?;
+    let then_branch = from_syntax_node(&children[1])?;
+    let else_branch = from_syntax_node(&children[2])?;
+    
+    Ok(NixAst::If {
+        condition: Box::new(condition),
+        then_branch: Box::new(then_branch),
+        else_branch: Box::new(else_branch),
+    })
 }
 
 fn parse_with(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement with parsing
-    Err(AstError::UnsupportedNode("with parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.len() < 2 {
+        return Err(AstError::InvalidStructure("With expression needs namespace and body".to_string()));
+    }
+    
+    let namespace = from_syntax_node(&children[0])?;
+    let body = from_syntax_node(&children[1])?;
+    
+    Ok(NixAst::With {
+        namespace: Box::new(namespace),
+        body: Box::new(body),
+    })
 }
 
 fn parse_assert(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement assert parsing
-    Err(AstError::UnsupportedNode("assert parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.len() < 2 {
+        return Err(AstError::InvalidStructure("Assert expression needs condition and body".to_string()));
+    }
+    
+    let condition = from_syntax_node(&children[0])?;
+    let body = from_syntax_node(&children[1])?;
+    
+    Ok(NixAst::Assert {
+        condition: Box::new(condition),
+        body: Box::new(body),
+    })
 }
 
 fn parse_binary_op(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement binary op parsing
-    Err(AstError::UnsupportedNode("binary op parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.len() < 2 {
+        return Err(AstError::InvalidStructure("Binary operation needs at least 2 operands".to_string()));
+    }
+    
+    // Find the operator token
+    let mut op = None;
+    for token in node.children_with_tokens() {
+        if let Some(token) = token.as_token() {
+            op = match token.kind() {
+                SyntaxKind::TOKEN_ADD => Some(BinaryOperator::Add),
+                SyntaxKind::TOKEN_SUB => Some(BinaryOperator::Subtract),
+                SyntaxKind::TOKEN_MUL => Some(BinaryOperator::Multiply),
+                SyntaxKind::TOKEN_DIV => Some(BinaryOperator::Divide),
+                SyntaxKind::TOKEN_EQUAL => Some(BinaryOperator::Equal),
+                SyntaxKind::TOKEN_NOT_EQUAL => Some(BinaryOperator::NotEqual),
+                SyntaxKind::TOKEN_LESS => Some(BinaryOperator::Less),
+                SyntaxKind::TOKEN_LESS_OR_EQ => Some(BinaryOperator::LessEqual),
+                SyntaxKind::TOKEN_MORE => Some(BinaryOperator::Greater),
+                SyntaxKind::TOKEN_MORE_OR_EQ => Some(BinaryOperator::GreaterEqual),
+                SyntaxKind::TOKEN_AND_AND => Some(BinaryOperator::And),
+                SyntaxKind::TOKEN_OR_OR => Some(BinaryOperator::Or),
+                SyntaxKind::TOKEN_IMPLICATION => Some(BinaryOperator::Implies),
+                SyntaxKind::TOKEN_CONCAT => Some(BinaryOperator::Concat),
+                SyntaxKind::TOKEN_UPDATE => Some(BinaryOperator::Update),
+                _ => None,
+            };
+            if op.is_some() {
+                break;
+            }
+        }
+    }
+    
+    let op = op
+        .ok_or_else(|| AstError::InvalidStructure("Binary operation missing operator".to_string()))?;
+    
+    let left = from_syntax_node(&children[0])?;
+    let right = from_syntax_node(&children[1])?;
+    
+    Ok(NixAst::BinaryOp {
+        op,
+        left: Box::new(left),
+        right: Box::new(right),
+    })
 }
 
 fn parse_unary_op(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement unary op parsing
-    Err(AstError::UnsupportedNode("unary op parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.is_empty() {
+        return Err(AstError::InvalidStructure("Unary operation needs an operand".to_string()));
+    }
+    
+    // Find the operator token
+    let mut op = None;
+    for token in node.children_with_tokens() {
+        if let Some(token) = token.as_token() {
+            op = match token.kind() {
+                SyntaxKind::TOKEN_INVERT => Some(UnaryOperator::Not),
+                SyntaxKind::TOKEN_SUB => Some(UnaryOperator::Negate),
+                _ => None,
+            };
+            if op.is_some() {
+                break;
+            }
+        }
+    }
+    
+    let op = op
+        .ok_or_else(|| AstError::InvalidStructure("Unary operation missing operator".to_string()))?;
+    
+    let operand = from_syntax_node(&children[0])?;
+    
+    Ok(NixAst::UnaryOp {
+        op,
+        operand: Box::new(operand),
+    })
 }
 
 fn parse_select(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement select parsing
-    Err(AstError::UnsupportedNode("select parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.len() < 2 {
+        return Err(AstError::InvalidStructure("Select needs expression and attribute path".to_string()));
+    }
+    
+    let expr = from_syntax_node(&children[0])?;
+    let attr_path = if children[1].kind() == SyntaxKind::NODE_ATTRPATH {
+        parse_attr_path(&children[1])?
+    } else {
+        // Try to create a simple attr path from an identifier
+        AttrPath {
+            segments: vec![AttrPathSegment::Identifier(children[1].text().to_string())],
+        }
+    };
+    
+    // Check for default value (after 'or' keyword)
+    let default = if children.len() > 2 {
+        // Look for the 'or' keyword in tokens
+        let mut found_or = false;
+        for token in node.children_with_tokens() {
+            if let Some(token) = token.as_token() {
+                if token.text() == "or" {
+                    found_or = true;
+                    break;
+                }
+            }
+        }
+        
+        if found_or {
+            Some(Box::new(from_syntax_node(&children[2])?))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    
+    Ok(NixAst::Select {
+        expr: Box::new(expr),
+        attr_path,
+        default,
+    })
 }
 
 fn parse_has_attr(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // TODO: Implement has_attr parsing
-    Err(AstError::UnsupportedNode("has_attr parsing not implemented".to_string()))
+    let children: Vec<_> = node.children().collect();
+    
+    if children.len() < 2 {
+        return Err(AstError::InvalidStructure("Has attr needs expression and attribute path".to_string()));
+    }
+    
+    let expr = from_syntax_node(&children[0])?;
+    let attr_path = if children[1].kind() == SyntaxKind::NODE_ATTRPATH {
+        parse_attr_path(&children[1])?
+    } else {
+        // Try to create a simple attr path from an identifier
+        AttrPath {
+            segments: vec![AttrPathSegment::Identifier(children[1].text().to_string())],
+        }
+    };
+    
+    Ok(NixAst::HasAttr {
+        expr: Box::new(expr),
+        attr_path,
+    })
 }
 
 #[cfg(test)]

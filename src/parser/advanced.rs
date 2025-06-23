@@ -92,6 +92,24 @@ impl AdvancedParser {
             }
             
             _ => {
+                // Check if this is a literal token
+                if let Some(token) = node.first_token() {
+                    let text = token.text();
+                    
+                    // Try to parse as literal
+                    if text == "true" {
+                        return Ok(NixAst::Bool(true));
+                    } else if text == "false" {
+                        return Ok(NixAst::Bool(false));
+                    } else if text == "null" {
+                        return Ok(NixAst::Null);
+                    } else if let Ok(int) = text.parse::<i64>() {
+                        return Ok(NixAst::Integer(int));
+                    } else if let Ok(float) = text.parse::<f64>() {
+                        return Ok(NixAst::Float(float));
+                    }
+                }
+                
                 // Try to find a meaningful child node
                 for child in node.children() {
                     if !matches!(child.kind(), SyntaxKind::TOKEN_WHITESPACE | SyntaxKind::TOKEN_COMMENT) {
@@ -102,6 +120,12 @@ impl AdvancedParser {
                 // Check if this is an import (import is not a special node in newer rnix)
                 if node.text().to_string().starts_with("import") {
                     return self.convert_import_expr(node);
+                }
+                
+                // As a last resort, treat it as an identifier
+                let text = node.text().to_string().trim().to_string();
+                if !text.is_empty() {
+                    return Ok(NixAst::Identifier(text));
                 }
                 
                 Err(NixDomainError::ParseError(format!("Unsupported node kind: {:?}", node.kind())))
@@ -149,7 +173,14 @@ impl AdvancedParser {
     }
 
     fn convert_identifier(&self, node: &SyntaxNode) -> Result<NixAst> {
-        Ok(NixAst::Identifier(node.text().to_string()))
+        let text = node.text().to_string();
+        // Check for keywords
+        match text.as_str() {
+            "true" => Ok(NixAst::Bool(true)),
+            "false" => Ok(NixAst::Bool(false)),
+            "null" => Ok(NixAst::Null),
+            _ => Ok(NixAst::Identifier(text)),
+        }
     }
 
     fn convert_attr_set(&self, node: &SyntaxNode) -> Result<NixAst> {
@@ -466,7 +497,7 @@ impl AdvancedParser {
         }
         
         let key = parts[0].trim();
-        let value_str = parts[1].trim();
+        let value_str = parts[1].trim().trim_end_matches(';').trim();
         
         // Simple parsing for common cases
         let value = if value_str.starts_with('"') && value_str.ends_with('"') {

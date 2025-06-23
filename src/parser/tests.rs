@@ -39,22 +39,22 @@ mod ast_parser_tests {
         // Test integer
         let int_ast = parser.parse_string("42").unwrap();
         match &int_ast.ast {
-            NixAst::Identifier(s) => assert_eq!(s, "42"), // Basic parser returns identifier
-            _ => panic!("Expected identifier for now"),
+            NixAst::Integer(42) => {}, // AdvancedParser correctly returns Integer
+            _ => panic!("Expected Integer(42), got {:?}", int_ast.ast),
         }
 
         // Test string
         let str_ast = parser.parse_string(r#""hello world""#).unwrap();
         match &str_ast.ast {
-            NixAst::Identifier(s) => assert!(s.contains("hello world")),
-            _ => panic!("Expected identifier for now"),
+            NixAst::String(s) => assert_eq!(s, "hello world"),
+            _ => panic!("Expected String, got {:?}", str_ast.ast),
         }
 
         // Test boolean
         let bool_ast = parser.parse_string("true").unwrap();
         match &bool_ast.ast {
-            NixAst::Identifier(s) => assert_eq!(s, "true"),
-            _ => panic!("Expected identifier for now"),
+            NixAst::Bool(true) => {},
+            _ => panic!("Expected Bool(true), got {:?}", bool_ast.ast),
         }
     }
 
@@ -80,15 +80,37 @@ mod ast_parser_tests {
 
         let parsed = parser.parse_string(attrset_content).unwrap();
         
-        // For now, the basic parser returns the whole thing as an identifier
-        // This test documents expected behavior once full parsing is implemented
+        // AdvancedParser should return a proper AttrSet
         match &parsed.ast {
-            NixAst::Identifier(content) => {
-                assert!(content.contains("name"));
-                assert!(content.contains("version"));
-                assert!(content.contains("enabled"));
+            NixAst::AttrSet { bindings, recursive } => {
+                assert!(!recursive);
+                assert!(bindings.len() >= 3); // At least 3 bindings
+                
+                // Check that we have the expected attributes
+                let has_name = bindings.iter().any(|b| {
+                    matches!(
+                        b.attr_path.segments.first(),
+                        Some(AttrPathSegment::Identifier(s)) if s == "name"
+                    )
+                });
+                let has_version = bindings.iter().any(|b| {
+                    matches!(
+                        b.attr_path.segments.first(),
+                        Some(AttrPathSegment::Identifier(s)) if s == "version"
+                    )
+                });
+                let has_enabled = bindings.iter().any(|b| {
+                    matches!(
+                        b.attr_path.segments.first(),
+                        Some(AttrPathSegment::Identifier(s)) if s == "enabled"
+                    )
+                });
+                
+                assert!(has_name, "Missing 'name' attribute");
+                assert!(has_version, "Missing 'version' attribute");
+                assert!(has_enabled, "Missing 'enabled' attribute");
             }
-            _ => panic!("Expected identifier for now"),
+            _ => panic!("Expected AttrSet, got {:?}", parsed.ast),
         }
     }
 
@@ -312,13 +334,17 @@ mod ast_parser_tests {
     fn test_parse_errors() {
         let parser = AdvancedParser::new();
 
-        // Test invalid syntax
+        // Test invalid syntax - unclosed attribute set
         let result = parser.parse_string("{ invalid syntax");
-        assert!(result.is_ok()); // Basic parser doesn't validate syntax yet
+        assert!(result.is_err()); // AdvancedParser should detect syntax errors
 
         // Test empty input
         let result = parser.parse_string("");
-        assert!(result.is_ok()); // Empty is valid
+        assert!(result.is_err()); // Empty input should be an error
+        
+        // Test invalid expression
+        let result = parser.parse_string("{ = }");
+        assert!(result.is_err()); // Invalid attribute set should be an error
     }
 
     /// Test attribute path handling
@@ -400,19 +426,444 @@ mod integration_tests {
         // Parse a simple expression
         let parsed = parser.parse_string(r#"{ x = 1; y = 2; }"#).unwrap();
 
-        // In a real implementation, we would:
-        // 1. Parse to proper AST
-        // 2. Find all integer values
-        // 3. Transform them (e.g., double them)
-        // 4. Verify the result
-
-        // For now, just verify we got something
+        // AdvancedParser returns a proper AttrSet
         match &parsed.ast {
-            NixAst::Identifier(content) => {
-                assert!(content.contains("x = 1"));
-                assert!(content.contains("y = 2"));
+            NixAst::AttrSet { bindings, .. } => {
+                assert_eq!(bindings.len(), 2);
+                
+                // Find the x binding
+                let x_binding = bindings.iter()
+                    .find(|b| matches!(
+                        b.attr_path.segments.first(),
+                        Some(AttrPathSegment::Identifier(s)) if s == "x"
+                    ))
+                    .expect("x binding not found");
+                
+                // Verify x = 1
+                match &x_binding.value {
+                    BindingValue::Value(NixAst::Integer(1)) => {},
+                    _ => panic!("Expected x = 1"),
+                }
+                
+                // Find the y binding
+                let y_binding = bindings.iter()
+                    .find(|b| matches!(
+                        b.attr_path.segments.first(),
+                        Some(AttrPathSegment::Identifier(s)) if s == "y"
+                    ))
+                    .expect("y binding not found");
+                
+                // Verify y = 2
+                match &y_binding.value {
+                    BindingValue::Value(NixAst::Integer(2)) => {},
+                    _ => panic!("Expected y = 2"),
+                }
             }
-            _ => panic!("Expected identifier for now"),
+            _ => panic!("Expected AttrSet, got {:?}", parsed.ast),
         }
+    }
+}
+
+#[test]
+fn test_parse_literals() {
+    // Integer
+    let int_file = NixFile::parse_string("42".to_string(), None).unwrap();
+    let ast = int_file.to_ast().unwrap();
+    match ast {
+        NixAst::Integer(42) => {},
+        _ => panic!("Expected Integer(42), got {:?}", ast),
+    }
+
+    // Float
+    let float_file = NixFile::parse_string("3.14".to_string(), None).unwrap();
+    let ast = float_file.to_ast().unwrap();
+    match ast {
+        NixAst::Float(f) => assert!((f - 3.14).abs() < 0.001),
+        _ => panic!("Expected Float(3.14), got {:?}", ast),
+    }
+
+    // String
+    let string_file = NixFile::parse_string(r#""hello world""#.to_string(), None).unwrap();
+    let ast = string_file.to_ast().unwrap();
+    match ast {
+        NixAst::String(s) => assert_eq!(s, "hello world"),
+        _ => panic!("Expected String, got {:?}", ast),
+    }
+
+    // Boolean
+    let bool_file = NixFile::parse_string("true".to_string(), None).unwrap();
+    let ast = bool_file.to_ast().unwrap();
+    match ast {
+        NixAst::Bool(true) => {},
+        _ => panic!("Expected Bool(true), got {:?}", ast),
+    }
+
+    // Null
+    let null_file = NixFile::parse_string("null".to_string(), None).unwrap();
+    let ast = null_file.to_ast().unwrap();
+    match ast {
+        NixAst::Null => {},
+        _ => panic!("Expected Null, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_list() {
+    let list_file = NixFile::parse_string("[1 2 3]".to_string(), None).unwrap();
+    let ast = list_file.to_ast().unwrap();
+    match ast {
+        NixAst::List(items) => {
+            assert_eq!(items.len(), 3);
+            match &items[0] {
+                NixAst::Integer(1) => {},
+                _ => panic!("Expected Integer(1)"),
+            }
+            match &items[1] {
+                NixAst::Integer(2) => {},
+                _ => panic!("Expected Integer(2)"),
+            }
+            match &items[2] {
+                NixAst::Integer(3) => {},
+                _ => panic!("Expected Integer(3)"),
+            }
+        },
+        _ => panic!("Expected List, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_attrset() {
+    let attrset_file = NixFile::parse_string(r#"{ foo = 42; bar = "hello"; }"#.to_string(), None).unwrap();
+    let ast = attrset_file.to_ast().unwrap();
+    match ast {
+        NixAst::AttrSet { recursive, bindings } => {
+            assert!(!recursive);
+            assert_eq!(bindings.len(), 2);
+            
+            // Check first binding
+            let binding = &bindings[0];
+            assert_eq!(binding.attr_path.segments.len(), 1);
+            match &binding.attr_path.segments[0] {
+                AttrPathSegment::Identifier(name) => assert_eq!(name, "foo"),
+                _ => panic!("Expected identifier"),
+            }
+            match &binding.value {
+                BindingValue::Value(NixAst::Integer(42)) => {},
+                _ => panic!("Expected Value(Integer(42))"),
+            }
+        },
+        _ => panic!("Expected AttrSet, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_recursive_attrset() {
+    let rec_file = NixFile::parse_string(r#"rec { a = 1; b = a + 1; }"#.to_string(), None).unwrap();
+    let ast = rec_file.to_ast().unwrap();
+    match ast {
+        NixAst::AttrSet { recursive, .. } => {
+            assert!(recursive);
+        },
+        _ => panic!("Expected AttrSet, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_function() {
+    // Simple function
+    let fn_file = NixFile::parse_string("x: x + 1".to_string(), None).unwrap();
+    let ast = fn_file.to_ast().unwrap();
+    match ast {
+        NixAst::Function { param, body } => {
+            match param {
+                FunctionParam::Identifier(name) => assert_eq!(name, "x"),
+                _ => panic!("Expected identifier parameter"),
+            }
+            match body.as_ref() {
+                NixAst::BinaryOp { op: BinaryOperator::Add, .. } => {},
+                _ => panic!("Expected binary addition"),
+            }
+        },
+        _ => panic!("Expected Function, got {:?}", ast),
+    }
+
+    // Pattern function
+    let pattern_file = NixFile::parse_string("{ a, b }: a + b".to_string(), None).unwrap();
+    let ast = pattern_file.to_ast().unwrap();
+    match ast {
+        NixAst::Function { param, .. } => {
+            match param {
+                FunctionParam::Pattern { fields, ellipsis, .. } => {
+                    assert_eq!(fields.len(), 2);
+                    assert!(!ellipsis);
+                },
+                _ => panic!("Expected pattern parameter"),
+            }
+        },
+        _ => panic!("Expected Function, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_let() {
+    let let_file = NixFile::parse_string("let x = 1; y = 2; in x + y".to_string(), None).unwrap();
+    let ast = let_file.to_ast().unwrap();
+    match ast {
+        NixAst::Let { bindings, body } => {
+            assert_eq!(bindings.len(), 2);
+            match body.as_ref() {
+                NixAst::BinaryOp { op: BinaryOperator::Add, .. } => {},
+                _ => panic!("Expected binary addition in body"),
+            }
+        },
+        _ => panic!("Expected Let, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_if() {
+    let if_file = NixFile::parse_string("if true then 1 else 2".to_string(), None).unwrap();
+    let ast = if_file.to_ast().unwrap();
+    match ast {
+        NixAst::If { condition, then_branch, else_branch } => {
+            match condition.as_ref() {
+                NixAst::Bool(true) => {},
+                _ => panic!("Expected Bool(true) condition"),
+            }
+            match then_branch.as_ref() {
+                NixAst::Integer(1) => {},
+                _ => panic!("Expected Integer(1) in then branch"),
+            }
+            match else_branch.as_ref() {
+                NixAst::Integer(2) => {},
+                _ => panic!("Expected Integer(2) in else branch"),
+            }
+        },
+        _ => panic!("Expected If, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_binary_ops() {
+    let tests = vec![
+        ("1 + 2", BinaryOperator::Add),
+        ("1 - 2", BinaryOperator::Subtract),
+        ("1 * 2", BinaryOperator::Multiply),
+        ("1 / 2", BinaryOperator::Divide),
+        ("1 == 2", BinaryOperator::Equal),
+        ("1 != 2", BinaryOperator::NotEqual),
+        ("1 < 2", BinaryOperator::Less),
+        ("1 <= 2", BinaryOperator::LessEqual),
+        ("1 > 2", BinaryOperator::Greater),
+        ("1 >= 2", BinaryOperator::GreaterEqual),
+        ("true && false", BinaryOperator::And),
+        ("true || false", BinaryOperator::Or),
+        ("[1] ++ [2]", BinaryOperator::Concat),
+        ("{ a = 1; } // { b = 2; }", BinaryOperator::Update),
+    ];
+
+    for (expr, expected_op) in tests {
+        let file = NixFile::parse_string(expr.to_string(), None).unwrap();
+        let ast = file.to_ast().unwrap();
+        match ast {
+            NixAst::BinaryOp { op, .. } => {
+                assert_eq!(op, expected_op, "Failed for expression: {}", expr);
+            },
+            _ => panic!("Expected BinaryOp for {}, got {:?}", expr, ast),
+        }
+    }
+}
+
+#[test]
+fn test_parse_unary_ops() {
+    // Negation
+    let neg_file = NixFile::parse_string("-5".to_string(), None).unwrap();
+    let ast = neg_file.to_ast().unwrap();
+    match ast {
+        NixAst::UnaryOp { op: UnaryOperator::Negate, operand } => {
+            match operand.as_ref() {
+                NixAst::Integer(5) => {},
+                _ => panic!("Expected Integer(5) operand"),
+            }
+        },
+        _ => panic!("Expected UnaryOp, got {:?}", ast),
+    }
+
+    // Not
+    let not_file = NixFile::parse_string("!true".to_string(), None).unwrap();
+    let ast = not_file.to_ast().unwrap();
+    match ast {
+        NixAst::UnaryOp { op: UnaryOperator::Not, operand } => {
+            match operand.as_ref() {
+                NixAst::Bool(true) => {},
+                _ => panic!("Expected Bool(true) operand"),
+            }
+        },
+        _ => panic!("Expected UnaryOp, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_select() {
+    let select_file = NixFile::parse_string("foo.bar".to_string(), None).unwrap();
+    let ast = select_file.to_ast().unwrap();
+    match ast {
+        NixAst::Select { expr, attr_path, default } => {
+            match expr.as_ref() {
+                NixAst::Identifier(name) => assert_eq!(name, "foo"),
+                _ => panic!("Expected Identifier"),
+            }
+            assert_eq!(attr_path.segments.len(), 1);
+            assert!(default.is_none());
+        },
+        _ => panic!("Expected Select, got {:?}", ast),
+    }
+
+    // With default
+    let select_default_file = NixFile::parse_string("foo.bar or 42".to_string(), None).unwrap();
+    let ast = select_default_file.to_ast().unwrap();
+    match ast {
+        NixAst::Select { default, .. } => {
+            assert!(default.is_some());
+            match default.unwrap().as_ref() {
+                NixAst::Integer(42) => {},
+                _ => panic!("Expected Integer(42) as default"),
+            }
+        },
+        _ => panic!("Expected Select, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_has_attr() {
+    let has_attr_file = NixFile::parse_string("foo ? bar".to_string(), None).unwrap();
+    let ast = has_attr_file.to_ast().unwrap();
+    match ast {
+        NixAst::HasAttr { expr, attr_path } => {
+            match expr.as_ref() {
+                NixAst::Identifier(name) => assert_eq!(name, "foo"),
+                _ => panic!("Expected Identifier"),
+            }
+            assert_eq!(attr_path.segments.len(), 1);
+        },
+        _ => panic!("Expected HasAttr, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_with() {
+    let with_file = NixFile::parse_string("with foo; bar".to_string(), None).unwrap();
+    let ast = with_file.to_ast().unwrap();
+    match ast {
+        NixAst::With { namespace, body } => {
+            match namespace.as_ref() {
+                NixAst::Identifier(name) => assert_eq!(name, "foo"),
+                _ => panic!("Expected Identifier namespace"),
+            }
+            match body.as_ref() {
+                NixAst::Identifier(name) => assert_eq!(name, "bar"),
+                _ => panic!("Expected Identifier body"),
+            }
+        },
+        _ => panic!("Expected With, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_assert() {
+    let assert_file = NixFile::parse_string("assert true; 42".to_string(), None).unwrap();
+    let ast = assert_file.to_ast().unwrap();
+    match ast {
+        NixAst::Assert { condition, body } => {
+            match condition.as_ref() {
+                NixAst::Bool(true) => {},
+                _ => panic!("Expected Bool(true) condition"),
+            }
+            match body.as_ref() {
+                NixAst::Integer(42) => {},
+                _ => panic!("Expected Integer(42) body"),
+            }
+        },
+        _ => panic!("Expected Assert, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_import() {
+    let import_file = NixFile::parse_string("import ./foo.nix".to_string(), None).unwrap();
+    let ast = import_file.to_ast().unwrap();
+    match ast {
+        NixAst::Import(expr) => {
+            match expr.as_ref() {
+                NixAst::Path(_) => {},
+                _ => panic!("Expected Path in import"),
+            }
+        },
+        _ => panic!("Expected Import, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_inherit() {
+    let inherit_file = NixFile::parse_string("{ inherit foo bar; }".to_string(), None).unwrap();
+    let ast = inherit_file.to_ast().unwrap();
+    match ast {
+        NixAst::AttrSet { bindings, .. } => {
+            assert_eq!(bindings.len(), 2);
+            for binding in bindings {
+                match &binding.value {
+                    BindingValue::Inherit { from, attrs } => {
+                        assert!(from.is_none());
+                        assert_eq!(attrs.len(), 1);
+                    },
+                    _ => panic!("Expected Inherit binding"),
+                }
+            }
+        },
+        _ => panic!("Expected AttrSet, got {:?}", ast),
+    }
+
+    // Inherit from
+    let inherit_from_file = NixFile::parse_string("{ inherit (foo) bar baz; }".to_string(), None).unwrap();
+    let ast = inherit_from_file.to_ast().unwrap();
+    match ast {
+        NixAst::AttrSet { bindings, .. } => {
+            assert_eq!(bindings.len(), 2);
+            for binding in bindings {
+                match &binding.value {
+                    BindingValue::Inherit { from, .. } => {
+                        assert!(from.is_some());
+                    },
+                    _ => panic!("Expected Inherit binding"),
+                }
+            }
+        },
+        _ => panic!("Expected AttrSet, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_complex_expression() {
+    let complex = r#"
+    let
+      x = 1;
+      y = 2;
+      f = a: b: a + b;
+    in
+      f x y
+    "#;
+    
+    let file = NixFile::parse_string(complex.to_string(), None).unwrap();
+    let ast = file.to_ast().unwrap();
+    match ast {
+        NixAst::Let { bindings, body } => {
+            assert_eq!(bindings.len(), 3);
+            // Check that body is a function application
+            match body.as_ref() {
+                NixAst::Apply { .. } => {},
+                _ => panic!("Expected Apply in body"),
+            }
+        },
+        _ => panic!("Expected Let, got {:?}", ast),
     }
 } 

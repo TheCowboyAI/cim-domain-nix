@@ -21,7 +21,7 @@ use crate::{Result, NixDomainError};
 pub use error::ParseError;
 pub use flake::{FlakeParser, ParsedFlake};
 pub use module::{ModuleParser, ParsedModule};
-pub use ast::{NixAst, FunctionParam, AttrPath, Binding, BinaryOperator, UnaryOperator};
+pub use ast::{NixAst, FunctionParam, AttrPath, Binding, BinaryOperator, UnaryOperator, AttrPathSegment, BindingValue};
 pub use advanced::AdvancedParser;
 pub use manipulator::{AstManipulator, AstBuilder};
 
@@ -87,6 +87,12 @@ impl NixFile {
     pub fn format(&self) -> Result<String> {
         // TODO: Implement proper formatting
         Ok(self.content.clone())
+    }
+    
+    /// Parse to our NixAst representation
+    pub fn to_ast(&self) -> Result<NixAst> {
+        ast::from_syntax_node(&self.ast)
+            .map_err(|e| NixDomainError::ParseError(e.to_string()))
     }
 }
 
@@ -311,47 +317,127 @@ pub enum NixExpr {
 impl NixExpr {
     /// Convert from AST node to expression
     pub fn from_ast(node: &SyntaxNode) -> Self {
-        match node.kind() {
-            SyntaxKind::NODE_STRING => {
-                let text = node.text().to_string();
-                // Remove quotes
-                let cleaned = text.trim_matches('"').to_string();
-                NixExpr::String(cleaned)
+        // Try to use our new parser first
+        match ast::from_syntax_node(node) {
+            Ok(ast) => Self::from_nix_ast(ast),
+            Err(_) => {
+                // Fallback to simple parsing
+                match node.kind() {
+                    SyntaxKind::NODE_STRING => {
+                        let text = node.text().to_string();
+                        // Remove quotes
+                        let cleaned = text.trim_matches('"').to_string();
+                        NixExpr::String(cleaned)
+                    }
+                    SyntaxKind::TOKEN_INTEGER => {
+                        let text = node.text().to_string();
+                        NixExpr::Int(text.parse().unwrap_or(0))
+                    }
+                    SyntaxKind::TOKEN_FLOAT => {
+                        let text = node.text().to_string();
+                        NixExpr::Float(text.parse().unwrap_or(0.0))
+                    }
+                    SyntaxKind::NODE_IDENT => {
+                        NixExpr::Identifier(node.text().to_string())
+                    }
+                    SyntaxKind::NODE_LIST => {
+                        let items = node.children()
+                            .map(|child| NixExpr::from_ast(&child))
+                            .collect();
+                        NixExpr::List(items)
+                    }
+                    SyntaxKind::NODE_ATTR_SET => {
+                        let mut attrs = std::collections::HashMap::new();
+                        
+                        // Simple attribute extraction - this is a simplified version
+                        for child in node.children() {
+                            if let Some(key_node) = child.children().next() {
+                                if let Some(value_node) = child.children().nth(1) {
+                                    let key = key_node.text().to_string();
+                                    let value = NixExpr::from_ast(&value_node);
+                                    attrs.insert(key, value);
+                                }
+                            }
+                        }
+                        
+                        NixExpr::AttrSet(attrs)
+                    }
+                    _ => NixExpr::Other(node.text().to_string()),
+                }
             }
-            SyntaxKind::TOKEN_INTEGER => {
-                let text = node.text().to_string();
-                NixExpr::Int(text.parse().unwrap_or(0))
-            }
-            SyntaxKind::TOKEN_FLOAT => {
-                let text = node.text().to_string();
-                NixExpr::Float(text.parse().unwrap_or(0.0))
-            }
-            SyntaxKind::NODE_IDENT => {
-                NixExpr::Identifier(node.text().to_string())
-            }
-            SyntaxKind::NODE_LIST => {
-                let items = node.children()
-                    .map(|child| NixExpr::from_ast(&child))
+        }
+    }
+    
+    /// Convert from our NixAst to NixExpr
+    fn from_nix_ast(ast: NixAst) -> Self {
+        match ast {
+            NixAst::Integer(i) => NixExpr::Int(i),
+            NixAst::Float(f) => NixExpr::Float(f),
+            NixAst::String(s) => NixExpr::String(s),
+            NixAst::Path(p) => NixExpr::Path(p),
+            NixAst::Bool(b) => NixExpr::Bool(b),
+            NixAst::Null => NixExpr::Other("null".to_string()),
+            NixAst::Identifier(id) => NixExpr::Identifier(id),
+            NixAst::List(items) => {
+                let exprs = items.into_iter()
+                    .map(Self::from_nix_ast)
                     .collect();
-                NixExpr::List(items)
+                NixExpr::List(exprs)
             }
-            SyntaxKind::NODE_ATTR_SET => {
+            NixAst::AttrSet { bindings, .. } => {
                 let mut attrs = std::collections::HashMap::new();
-                
-                // Simple attribute extraction - this is a simplified version
-                for child in node.children() {
-                    if let Some(key_node) = child.children().next() {
-                        if let Some(value_node) = child.children().nth(1) {
-                            let key = key_node.text().to_string();
-                            let value = NixExpr::from_ast(&value_node);
-                            attrs.insert(key, value);
+                for binding in bindings {
+                    // Simple conversion - just use the first segment of the path
+                    if let Some(first_segment) = binding.attr_path.segments.first() {
+                        if let AttrPathSegment::Identifier(name) = first_segment {
+                            if let BindingValue::Value(value) = binding.value {
+                                attrs.insert(name.clone(), Self::from_nix_ast(value));
+                            }
                         }
                     }
                 }
-                
                 NixExpr::AttrSet(attrs)
             }
-            _ => NixExpr::Other(node.text().to_string()),
+            NixAst::Function { param, body } => {
+                let param_name = match param {
+                    FunctionParam::Identifier(id) => id,
+                    FunctionParam::Pattern { .. } => "args".to_string(),
+                };
+                NixExpr::Lambda(param_name, Box::new(Self::from_nix_ast(*body)))
+            }
+            NixAst::Apply { function, argument } => {
+                NixExpr::Apply(
+                    Box::new(Self::from_nix_ast(*function)),
+                    Box::new(Self::from_nix_ast(*argument))
+                )
+            }
+            NixAst::Let { bindings, body } => {
+                let mut let_bindings = Vec::new();
+                for binding in bindings {
+                    if let Some(first_segment) = binding.attr_path.segments.first() {
+                        if let AttrPathSegment::Identifier(name) = first_segment {
+                            if let BindingValue::Value(value) = binding.value {
+                                let_bindings.push((name.clone(), Self::from_nix_ast(value)));
+                            }
+                        }
+                    }
+                }
+                NixExpr::Let(let_bindings, Box::new(Self::from_nix_ast(*body)))
+            }
+            NixAst::If { condition, then_branch, else_branch } => {
+                NixExpr::If(
+                    Box::new(Self::from_nix_ast(*condition)),
+                    Box::new(Self::from_nix_ast(*then_branch)),
+                    Box::new(Self::from_nix_ast(*else_branch))
+                )
+            }
+            NixAst::With { namespace, body } => {
+                NixExpr::With(
+                    Box::new(Self::from_nix_ast(*namespace)),
+                    Box::new(Self::from_nix_ast(*body))
+                )
+            }
+            _ => NixExpr::Other(format!("{:?}", ast)),
         }
     }
 }
