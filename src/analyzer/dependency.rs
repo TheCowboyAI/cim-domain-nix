@@ -238,7 +238,7 @@ impl DependencyAnalyzer {
                         | SyntaxKind::NODE_PATH => {
                             return Some(value_child);
                         }
-                        _ => continue,
+                        _ => {} // Do nothing for other node types
                     }
                 }
             }

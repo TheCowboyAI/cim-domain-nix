@@ -2,6 +2,31 @@
 //!
 //! This module contains immutable value objects that represent
 //! core concepts in the Nix ecosystem.
+//!
+//! # Examples
+//!
+//! ## Working with Flake References
+//!
+//! ```
+//! use cim_domain_nix::value_objects::FlakeRef;
+//!
+//! let flake = FlakeRef::new("github:NixOS/nixpkgs")
+//!     .with_revision("nixos-23.11")
+//!     .with_subflake("lib");
+//!
+//! assert_eq!(flake.to_string(), "github:NixOS/nixpkgs/nixos-23.11#lib");
+//! ```
+//!
+//! ## Parsing Store Paths
+//!
+//! ```
+//! use cim_domain_nix::value_objects::StorePath;
+//!
+//! let path = StorePath::parse("/nix/store/abc123-hello-1.0").unwrap();
+//! assert_eq!(path.hash, "abc123");
+//! assert_eq!(path.name, "hello-1.0");
+//! assert_eq!(path.to_string(), "/nix/store/abc123-hello-1.0");
+//! ```
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

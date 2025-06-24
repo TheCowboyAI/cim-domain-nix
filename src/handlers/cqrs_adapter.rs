@@ -1,14 +1,13 @@
-//! CQRS adapter for Nix domain commands
+//! CQRS adapter for Nix domain
 
 use crate::commands::{CreateFlake, UpdateFlake, BuildPackage};
-use crate::events::{FlakeCreated, FlakeUpdated, PackageBuilt, NixDomainEvent};
 use crate::handlers::NixCommandHandler;
 use crate::aggregate::FlakeAggregate;
+use crate::NixDomainError;
 use cim_domain::{
-    Command, CommandHandler, CommandEnvelope, CommandAcknowledgment, CommandStatus,
-    EventPublisher, EntityId, DomainEventEnum
+    Command, CommandHandler, CommandAcknowledgment, CommandStatus,
+    EntityId, CommandEnvelope
 };
-use cim_subject::CorrelationId;
 use std::sync::Arc;
 
 /// Wrapper for Nix commands to implement CQRS Command trait

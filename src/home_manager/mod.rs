@@ -1,20 +1,19 @@
-//! Home Manager integration for analyzing and converting configurations
+//! Home Manager configuration support
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::collections::HashMap;
+use uuid::Uuid;
+use crate::value_objects::NixValue;
 
 pub mod analyzer;
-pub mod converter;
 pub mod program_converter;
+pub mod converter;
+
+/// Represents a Home Manager configuration
 
 pub use analyzer::HomeManagerAnalyzer;
-pub use converter::DotfileConverter;
 pub use program_converter::ProgramConverter;
-
-use crate::parser::{NixParser, ParsedFile};
-use crate::value_objects::NixValue;
-use crate::NixDomainError;
 
 /// Configuration for a Home Manager setup
 #[derive(Debug, Clone, Serialize, Deserialize)]

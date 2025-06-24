@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use super::{ProgramConfig, DotfileConverter};
-use super::converter::{GitConverter, VimConverter, ZshConverter, TmuxConverter};
+use super::ProgramConfig;
+use super::converter::{DotfileConverter, GitConverter, VimConverter, ZshConverter, TmuxConverter};
 use crate::NixDomainError;
 
 /// Manages converters for different programs and orchestrates dotfile conversions

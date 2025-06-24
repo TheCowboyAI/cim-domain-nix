@@ -1,12 +1,66 @@
-//! Domain model for Nix operations
+//! Domain-Driven Design module for Nix ecosystem operations
+//! 
+//! This module provides comprehensive support for working with the Nix package manager
+//! and NixOS configuration management within the CIM architecture.
 //!
-//! This crate provides a domain-driven design (DDD) model for interacting
-//! with Nix, including flakes, packages, modules, overlays, and NixOS configurations.
+//! # Examples
+//!
+//! ## Creating a Nix Flake
+//!
+//! ```no_run
+//! # use cim_domain_nix::{commands::CreateFlake, handlers::NixCommandHandler};
+//! # use std::path::PathBuf;
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let handler = NixCommandHandler::new();
+//! 
+//! let cmd = CreateFlake {
+//!     path: PathBuf::from("/tmp/my-project"),
+//!     description: "My Rust project".to_string(),
+//!     template: Some("rust".to_string()),
+//! };
+//! 
+//! let events = handler.handle_command(Box::new(cmd)).await?;
+//! println!("Created flake with {} events", events.len());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Building a Package
+//!
+//! ```no_run
+//! # use cim_domain_nix::{commands::BuildPackage, handlers::NixCommandHandler, value_objects::AttributePath};
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let handler = NixCommandHandler::new();
+//! 
+//! let cmd = BuildPackage {
+//!     flake_ref: "nixpkgs".to_string(),
+//!     attribute: AttributePath::from_str("hello"),
+//!     output_path: None,
+//! };
+//! 
+//! let events = handler.handle_command(Box::new(cmd)).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Working with Attribute Paths
+//!
+//! ```
+//! use cim_domain_nix::value_objects::AttributePath;
+//! 
+//! let path = AttributePath::from_str("packages.x86_64-linux.hello");
+//! assert_eq!(path.segments.len(), 3);
+//! assert_eq!(path.to_string(), "packages.x86_64-linux.hello");
+//! ```
 
 #![warn(missing_docs)]
-#![warn(clippy::all)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(clippy::must_use_candidate)]
+
+use thiserror::Error;
 
 pub mod aggregate;
 pub mod analyzer;
@@ -40,7 +94,6 @@ pub use value_objects::*;
 pub use templates::*;
 
 use std::io;
-use thiserror::Error;
 
 /// Result type for Nix domain operations
 pub type Result<T> = std::result::Result<T, NixDomainError>;

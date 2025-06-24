@@ -16,7 +16,6 @@ use std::process::Command;
 use tokio::fs;
 use uuid::Uuid;
 use chrono::Utc;
-use crate::value_objects::{Flake, FlakeRef, StorePath, Derivation};
 use crate::parser::{NixFile, FlakeParser};
 
 /// Handler for flake-related commands
@@ -85,6 +84,13 @@ impl FlakeCommandHandler {
                 .output()
                 .map_err(|e| NixDomainError::CommandError(format!("Failed to init git: {e}")))?;
         }
+
+        // Add flake.nix to git
+        Command::new("git")
+            .args(["add", "flake.nix"])
+            .current_dir(&cmd.path)
+            .output()
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to add flake.nix to git: {e}")))?;
 
         // Run nix flake init if template was not provided
         if cmd.template.is_none() {

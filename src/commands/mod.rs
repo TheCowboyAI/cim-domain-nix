@@ -1,14 +1,14 @@
 //! Commands for Nix domain operations
 
+use std::any::Any;
+use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration};
 use crate::events::ActivationType;
 use crate::aggregate::FlakeAggregate;
-use std::path::PathBuf;
-use uuid::Uuid;
-use std::any::Any;
-use cim_domain::{Command, EntityId};
 
-/// Base trait for all Nix commands
+/// Trait for all Nix commands
 pub trait NixCommand: Send + Sync {
     /// Get the command ID
     fn command_id(&self) -> Uuid;

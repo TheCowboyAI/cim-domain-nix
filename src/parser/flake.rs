@@ -97,7 +97,7 @@ impl FlakeParser {
         }
     }
 
-    fn extract_outputs(attrset: &SyntaxNode) -> Result<FlakeOutputs> {
+    fn extract_outputs(_attrset: &SyntaxNode) -> Result<FlakeOutputs> {
         let outputs = FlakeOutputs {
             packages: HashMap::new(),
             dev_shells: HashMap::new(),

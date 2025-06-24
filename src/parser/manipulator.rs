@@ -1,11 +1,10 @@
 //! AST manipulation utilities for modifying Nix expressions
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 use crate::Result;
 use super::ast::{
-    NixAst, FunctionParam, PatternField, AttrPath, AttrPathSegment,
-    Binding, BindingValue, BinaryOperator, UnaryOperator
+    NixAst, FunctionParam, AttrPath, AttrPathSegment,
+    Binding, BindingValue, BinaryOperator
 };
 
 /// AST manipulator for transforming Nix expressions

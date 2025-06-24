@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 
 use super::{
-    HomeConfiguration, ProgramConfig, ServiceConfig, FileMapping,
+    HomeConfiguration, ProgramConfig, ServiceConfig,
     HomeAnalysis, ProgramAnalysis, ServiceAnalysis, DotfileInfo,
     ConflictInfo, ConflictType, Suggestion, SuggestionType,
     Priority, ComplexityScore, SecurityScore, ResourceUsage,
@@ -307,8 +307,7 @@ impl HomeManagerAnalyzer {
             if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
                 match file_name {
                     ".gitconfig" | "gitconfig" => {
-                        let mut git_config = ProgramConfig::new(true);
-                        // Parse git config and convert to Home Manager format
+                        let git_config = ProgramConfig::new(true);
                         config.add_program("git".to_string(), git_config);
                     }
                     ".vimrc" | "vimrc" => {

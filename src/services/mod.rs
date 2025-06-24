@@ -1,22 +1,18 @@
 //! Domain services for Nix operations
 
 use crate::{
-    commands::{CreateFlake, AddFlakeInput, CheckFlake, BuildPackage, DevelopFlake,
-               CreateConfiguration, ActivateConfiguration, RunGarbageCollection},
+    commands::{CreateFlake, UpdateFlake, BuildPackage, EvaluateExpression, RunGarbageCollection, CreateConfiguration, ActivateConfiguration, AddFlakeInput, CheckFlake, DevelopFlake},
     events::{FlakeCreated, PackageBuilt, ActivationType, ConfigurationActivated, GarbageCollected},
-    value_objects::{Flake, FlakeRef, AttributePath, StorePath, Derivation, NixOSConfiguration},
     handlers::NixCommandHandler,
     projections::NixProjection,
-    queries::{
-        NixQueryHandler, AdvancedNixQueryHandler,
-        FindFlakeQuery, FindPackageQuery, FindConfigurationQuery, SearchNixPackagesQuery,
-        FlakeView, PackageView, ConfigurationView, PackageSearchResult,
-    },
+    queries::{FindFlakeQuery, FindPackageQuery, SearchNixPackagesQuery, FindConfigurationQuery, NixQueryHandler, AdvancedNixQueryHandler, FlakeView, PackageView, ConfigurationView, PackageSearchResult},
+    value_objects::{AttributePath, NixOSConfiguration},
     Result, NixDomainError,
 };
 use std::path::PathBuf;
-use std::process::Command;
+use std::time::Duration;
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
 
 /// Service for managing Nix development environments
 pub struct NixDevelopmentService {
