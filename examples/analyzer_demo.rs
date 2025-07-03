@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     // Create analyzer
     let mut analyzer = NixAnalyzer::with_config(config);
 
-    println!("Analyzing Nix files in: {}", repo_path.display());
+    println!("Analyzing Nix files in: {repo_path.display(}"));
     if check_formatting {
         println!("Formatting check enabled");
     }
@@ -49,13 +49,13 @@ async fn main() -> anyhow::Result<()> {
     println!("✅ Analysis Complete!\n");
 
     println!("📊 Summary:");
-    println!("  - Files analyzed: {}", report.files_analyzed);
+    println!("  - Files analyzed: {report.files_analyzed}");
     println!("  - Analysis time: {:.2?}", report.duration);
 
     // Dependency information
     println!("\n🔗 Dependency Graph:");
-    println!("  - Total files: {}", report.dependency_graph.node_count());
-    println!("  - Dependencies: {}", report.dependency_graph.edge_count());
+    println!("  - Total files: {report.dependency_graph.node_count(}"));
+    println!("  - Dependencies: {report.dependency_graph.edge_count(}"));
     
     // Calculate max depth
     let depths = petgraph::algo::dijkstra(
@@ -65,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
         |_| 1,
     );
     let max_depth = depths.values().max().unwrap_or(&0);
-    println!("  - Max dependency depth: {}", max_depth);
+    println!("  - Max dependency depth: {max_depth}");
 
     // Security issues
     if report.security_issues.is_empty() {
@@ -78,24 +78,24 @@ async fn main() -> anyhow::Result<()> {
         let medium = report.security_issues.iter().filter(|i| i.severity == Severity::Medium).count();
         let low = report.security_issues.iter().filter(|i| i.severity == Severity::Low).count();
 
-        println!("\n🔒 Security Issues Found: {}", report.security_issues.len());
-        if critical > 0 { println!("  - 🚨 Critical: {}", critical); }
-        if high > 0 { println!("  - ❗ High: {}", high); }
-        if medium > 0 { println!("  - ⚠️  Medium: {}", medium); }
-        if low > 0 { println!("  - ℹ️  Low: {}", low); }
+        println!("\n🔒 Security Issues Found: {report.security_issues.len(}"));
+        if critical > 0 { println!("  - 🚨 Critical: {critical}"); }
+        if high > 0 { println!("  - ❗ High: {high}"); }
+        if medium > 0 { println!("  - ⚠️  Medium: {medium}"); }
+        if low > 0 { println!("  - ℹ️  Low: {low}"); }
 
         println!("\n  Top issues:");
         for (i, issue) in report.security_issues.iter().take(5).enumerate() {
-            println!("  {}. [{:?}] {}", i + 1, issue.severity, issue.description);
+            println!("  {i + 1}. [{:?}] {issue.severity}", issue.description);
             if let Some(file) = &issue.file {
-                println!("     File: {}", file);
+                println!("     File: {file}");
             }
             if let Some(suggestion) = &issue.suggestion {
-                println!("     💡 {}", suggestion);
+                println!("     💡 {suggestion}");
             }
         }
         if report.security_issues.len() > 5 {
-            println!("  ... and {} more", report.security_issues.len() - 5);
+            println!("  ... and {report.security_issues.len(} more") - 5);
         }
     }
 
@@ -109,26 +109,26 @@ async fn main() -> anyhow::Result<()> {
         let medium = report.performance_issues.iter().filter(|i| i.impact == ImpactLevel::Medium).count();
         let low = report.performance_issues.iter().filter(|i| i.impact == ImpactLevel::Low).count();
 
-        println!("\n⚡ Performance Issues Found: {}", report.performance_issues.len());
-        if high > 0 { println!("  - 🔴 High impact: {}", high); }
-        if medium > 0 { println!("  - 🟡 Medium impact: {}", medium); }
-        if low > 0 { println!("  - 🟢 Low impact: {}", low); }
+        println!("\n⚡ Performance Issues Found: {report.performance_issues.len(}"));
+        if high > 0 { println!("  - 🔴 High impact: {high}"); }
+        if medium > 0 { println!("  - 🟡 Medium impact: {medium}"); }
+        if low > 0 { println!("  - 🟢 Low impact: {low}"); }
 
         println!("\n  Top issues:");
         for (i, issue) in report.performance_issues.iter().take(3).enumerate() {
-            println!("  {}. [{:?}] {}", i + 1, issue.impact, issue.description);
+            println!("  {i + 1}. [{:?}] {issue.impact}", issue.description);
             if let Some(file) = &issue.file {
-                println!("     File: {}", file);
+                println!("     File: {file}");
             }
             if let Some(cost) = &issue.cost_estimate {
-                println!("     Cost: {}", cost);
+                println!("     Cost: {cost}");
             }
             if let Some(suggestion) = &issue.suggestion {
-                println!("     💡 {}", suggestion);
+                println!("     💡 {suggestion}");
             }
         }
         if report.performance_issues.len() > 3 {
-            println!("  ... and {} more", report.performance_issues.len() - 3);
+            println!("  ... and {report.performance_issues.len(} more") - 3);
         }
     }
 
@@ -142,20 +142,20 @@ async fn main() -> anyhow::Result<()> {
             *by_type.entry(format!("{:?}", dead.code_type)).or_insert(0) += 1;
         }
 
-        println!("\n🧹 Dead Code Found: {}", report.dead_code.len());
+        println!("\n🧹 Dead Code Found: {report.dead_code.len(}"));
         for (code_type, count) in by_type {
-            println!("  - {}: {}", code_type, count);
+            println!("  - {code_type}: {count}");
         }
 
         println!("\n  Examples:");
         for (i, dead) in report.dead_code.iter().take(3).enumerate() {
-            println!("  {}. {:?}: {}", i + 1, dead.code_type, dead.name);
+            println!("  {i + 1}. {:?}: {dead.code_type}", dead.name);
             if let Some(file) = &dead.file {
-                println!("     File: {}", file);
+                println!("     File: {file}");
             }
         }
         if report.dead_code.len() > 3 {
-            println!("  ... and {} more", report.dead_code.len() - 3);
+            println!("  ... and {report.dead_code.len(} more") - 3);
         }
     }
 
@@ -164,13 +164,13 @@ async fn main() -> anyhow::Result<()> {
         if formatting_issues.is_empty() {
             println!("\n✨ All files are properly formatted!");
         } else {
-            println!("\n📐 Formatting Issues Found: {}", formatting_issues.len());
+            println!("\n📐 Formatting Issues Found: {formatting_issues.len(}"));
             println!("  Files that need formatting:");
             for (i, file) in formatting_issues.iter().take(5).enumerate() {
-                println!("  {}. {}", i + 1, file);
+                println!("  {i + 1}. {file}");
             }
             if formatting_issues.len() > 5 {
-                println!("  ... and {} more", formatting_issues.len() - 5);
+                println!("  ... and {formatting_issues.len(} more") - 5);
             }
             println!("\n  💡 Run a Nix formatter to fix these issues");
         }

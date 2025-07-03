@@ -149,7 +149,7 @@ impl AdvancedParser {
         } else if let Ok(float) = text.parse::<f64>() {
             Ok(NixAst::Float(float))
         } else {
-            Err(NixDomainError::ParseError(format!("Unknown literal: {}", text)))
+            Err(NixDomainError::ParseError(format!("Unknown literal: {text}")))
         }
     }
 
@@ -586,7 +586,7 @@ impl AdvancedParser {
             "->" => Ok(BinaryOperator::Implies),
             "++" => Ok(BinaryOperator::Concat),
             "//" => Ok(BinaryOperator::Update),
-            _ => Err(NixDomainError::ParseError(format!("Unknown binary operator: {}", text)))
+            _ => Err(NixDomainError::ParseError(format!("Unknown binary operator: {text}")))
         }
     }
 
@@ -594,7 +594,7 @@ impl AdvancedParser {
         match text {
             "!" => Ok(UnaryOperator::Not),
             "-" => Ok(UnaryOperator::Negate),
-            _ => Err(NixDomainError::ParseError(format!("Unknown unary operator: {}", text)))
+            _ => Err(NixDomainError::ParseError(format!("Unknown unary operator: {text}")))
         }
     }
 

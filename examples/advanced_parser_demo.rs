@@ -78,10 +78,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         matches!(node, NixAst::String(_))
     });
     
-    println!("Found {} string literals in the flake", strings.len());
+    println!("Found {strings.len(} string literals in the flake"));
     for (i, s) in strings.iter().enumerate() {
         if let NixAst::String(content) = s {
-            println!("  {}: {}", i + 1, content);
+            println!("  {i + 1}: {content}");
         }
     }
 
@@ -144,10 +144,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 7: Pretty print the AST
     println!("\n7. AST Statistics:");
     let stats = analyze_ast(&parsed.ast);
-    println!("  Total nodes: {}", stats.total_nodes);
+    println!("  Total nodes: {stats.total_nodes}");
     println!("  Node types:");
     for (node_type, count) in stats.node_counts {
-        println!("    {}: {}", node_type, count);
+        println!("    {node_type}: {count}");
     }
 
     Ok(())

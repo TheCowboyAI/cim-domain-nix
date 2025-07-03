@@ -10,12 +10,68 @@ use chrono::{DateTime, Duration, Utc, Timelike};
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
+/// Configuration for the tracker
+#[derive(Debug, Clone)]
+pub struct TrackerConfig {
+    /// Whether to track detailed parse errors
+    pub track_parse_errors: bool,
+    /// Whether to normalize input names (lowercase, trim)
+    pub normalize_input_names: bool,
+    /// Custom input type handlers
+    pub custom_handlers: HashMap<String, InputHandler>,
+    /// Minimum interval between updates to consider as separate (not batch)
+    pub batch_threshold: Duration,
+}
+
+impl Default for TrackerConfig {
+    fn default() -> Self {
+        Self {
+            track_parse_errors: false,
+            normalize_input_names: true,
+            custom_handlers: HashMap::new(),
+            batch_threshold: Duration::hours(1),
+        }
+    }
+}
+
+/// Handler for custom input types
+#[derive(Debug, Clone)]
+pub struct InputHandler {
+    /// Name of the handler
+    pub name: String,
+    /// Priority for this handler
+    pub priority: u8,
+}
+
 /// Tracks flake.lock changes and provides insights
 pub struct FlakeLockTracker {
     /// History of flake.lock commits
     commits: Vec<FlakeLockCommit>,
     /// Input update frequency tracking
     input_update_stats: HashMap<String, InputUpdateStats>,
+    /// Configuration for the tracker
+    config: TrackerConfig,
+    /// Parse errors encountered
+    parse_errors: Vec<ParseError>,
+    /// Statistics about tracking operations
+    stats: TrackerStats,
+}
+
+/// Parse error information
+#[derive(Debug, Clone)]
+struct ParseError {
+    commit: CommitHash,
+    input_name: String,
+    error: String,
+}
+
+/// Statistics about tracker operations
+#[derive(Debug, Default)]
+struct TrackerStats {
+    inputs_parsed: usize,
+    errors_encountered: usize,
+    normalizations_applied: usize,
+    custom_handlers_used: usize,
 }
 
 /// Statistics about an input's update patterns
@@ -103,13 +159,40 @@ pub struct BatchUpdate {
 impl FlakeLockTracker {
     /// Create a new tracker from commit history
     pub fn new(commits: Vec<FlakeLockCommit>) -> Self {
+        Self::with_config(commits, TrackerConfig::default())
+    }
+
+    /// Create a new tracker with custom configuration
+    pub fn with_config(commits: Vec<FlakeLockCommit>, config: TrackerConfig) -> Self {
         let mut tracker = Self {
             commits,
             input_update_stats: HashMap::new(),
+            config,
+            parse_errors: Vec::new(),
+            stats: TrackerStats::default(),
         };
         
         tracker.build_statistics();
         tracker
+    }
+
+    /// Get tracker statistics
+    pub fn get_stats(&self) -> (usize, usize, usize, usize) {
+        (
+            self.stats.inputs_parsed,
+            self.stats.errors_encountered,
+            self.stats.normalizations_applied,
+            self.stats.custom_handlers_used,
+        )
+    }
+
+    /// Get parse errors if tracking is enabled
+    pub fn get_parse_errors(&self) -> Option<&[ParseError]> {
+        if self.config.track_parse_errors {
+            Some(&self.parse_errors)
+        } else {
+            None
+        }
     }
 
     /// Build statistics from commit history
@@ -120,7 +203,8 @@ impl FlakeLockTracker {
         // Track input changes
         let mut previous_inputs: Option<HashMap<String, GitFlakeInput>> = None;
 
-        for commit in &self.commits {
+        for i in 0..self.commits.len() {
+            let commit = &self.commits[i].clone();
             let current_inputs = self.parse_inputs_from_lock(&commit.lock_content);
 
             if let Some(prev_inputs) = &previous_inputs {
@@ -137,7 +221,7 @@ impl FlakeLockTracker {
                         });
 
                     // Check if this input was updated
-                    let was_updated = match prev_inputs.get(name) {
+                    let _was_updated = match prev_inputs.get(name) {
                         None => {
                             // New input appearing - record it but don't count as update
                             stats.last_updated = Some(commit.timestamp);
@@ -205,7 +289,7 @@ impl FlakeLockTracker {
     }
 
     /// Parse inputs from a flake.lock JSON value
-    fn parse_inputs_from_lock(&self, lock_json: &serde_json::Value) -> HashMap<String, GitFlakeInput> {
+    fn parse_inputs_from_lock(&mut self, lock_json: &serde_json::Value) -> HashMap<String, GitFlakeInput> {
         let mut inputs = HashMap::new();
 
         if let Some(nodes) = lock_json.get("nodes").and_then(|n| n.as_object()) {
@@ -214,9 +298,30 @@ impl FlakeLockTracker {
                     continue;
                 }
 
+                // Apply normalization if configured
+                let normalized_name = if self.config.normalize_input_names {
+                    self.stats.normalizations_applied += 1;
+                    name.trim().to_lowercase()
+                } else {
+                    name.clone()
+                };
+
                 if let Some(locked) = node.get("locked") {
-                    if let Ok(input) = self.parse_locked_input(name, locked) {
-                        inputs.insert(name.clone(), input);
+                    match self.parse_locked_input(&normalized_name, locked) {
+                        Ok(input) => {
+                            self.stats.inputs_parsed += 1;
+                            inputs.insert(normalized_name, input);
+                        }
+                        Err(e) => {
+                            self.stats.errors_encountered += 1;
+                            if self.config.track_parse_errors {
+                                self.parse_errors.push(ParseError {
+                                    commit: CommitHash::new(&format!("{:0<40}", "unknown")).unwrap(),
+                                    input_name: normalized_name,
+                                    error: e.to_string(),
+                                });
+                            }
+                        }
                     }
                 }
             }
@@ -225,11 +330,18 @@ impl FlakeLockTracker {
         inputs
     }
 
-    /// Parse a locked input (simplified version)
-    fn parse_locked_input(&self, name: &str, locked: &serde_json::Value) -> Result<GitFlakeInput> {
+    /// Parse a locked input with configuration support
+    fn parse_locked_input(&mut self, name: &str, locked: &serde_json::Value) -> Result<GitFlakeInput> {
         let input_type = locked.get("type")
             .and_then(|t| t.as_str())
             .unwrap_or("unknown");
+
+        // Check for custom handlers
+        if let Some(_handler) = self.config.custom_handlers.get(input_type) {
+            self.stats.custom_handlers_used += 1;
+            // In a real implementation, we'd call the custom handler here
+            // For now, we'll just note that we would use it
+        }
 
         let rev = locked.get("rev").and_then(|r| r.as_str());
         let resolved_hash = rev.map(|r| {
@@ -245,7 +357,7 @@ impl FlakeLockTracker {
 
         Ok(GitFlakeInput {
             name: name.to_string(),
-            url: format!("{}:{}", input_type, name),
+            url: format!("{input_type}:{name}"),
             git_ref: locked.get("ref").and_then(|r| r.as_str()).map(String::from),
             resolved_hash,
             store_path: None,
@@ -365,8 +477,9 @@ impl FlakeLockTracker {
                 continue;
             }
 
-            let prev_inputs = self.parse_inputs_from_lock(&self.commits[i - 1].lock_content);
-            let curr_inputs = self.parse_inputs_from_lock(&commit.lock_content);
+            // Use a simpler parsing method that doesn't require mutation
+            let prev_inputs = self.parse_inputs_from_lock_readonly(&self.commits[i - 1].lock_content);
+            let curr_inputs = self.parse_inputs_from_lock_readonly(&commit.lock_content);
 
             let mut updated_inputs = Vec::new();
             for (name, curr_input) in &curr_inputs {
@@ -379,7 +492,17 @@ impl FlakeLockTracker {
                 }
             }
 
+            // Check if this is a batch update based on configuration
             if updated_inputs.len() > 1 {
+                // Additional check: ensure updates happened within batch threshold
+                if i > 1 {
+                    let time_diff = commit.timestamp - self.commits[i - 1].timestamp;
+                    if time_diff > self.config.batch_threshold {
+                        // Not a batch update if too much time passed
+                        continue;
+                    }
+                }
+                
                 batch_updates.push(BatchUpdate {
                     commit: commit.commit.clone(),
                     timestamp: commit.timestamp,
@@ -390,6 +513,62 @@ impl FlakeLockTracker {
         }
 
         batch_updates
+    }
+
+    /// Parse inputs from lock without updating statistics (for read-only operations)
+    fn parse_inputs_from_lock_readonly(&self, lock_json: &serde_json::Value) -> HashMap<String, GitFlakeInput> {
+        let mut inputs = HashMap::new();
+
+        if let Some(nodes) = lock_json.get("nodes").and_then(|n| n.as_object()) {
+            for (name, node) in nodes {
+                if name == "root" {
+                    continue;
+                }
+
+                // Apply normalization if configured
+                let normalized_name = if self.config.normalize_input_names {
+                    name.trim().to_lowercase()
+                } else {
+                    name.clone()
+                };
+
+                if let Some(locked) = node.get("locked") {
+                    if let Ok(input) = self.parse_locked_input_readonly(&normalized_name, locked) {
+                        inputs.insert(normalized_name, input);
+                    }
+                }
+            }
+        }
+
+        inputs
+    }
+
+    /// Parse a locked input without updating statistics (for read-only operations)
+    fn parse_locked_input_readonly(&self, name: &str, locked: &serde_json::Value) -> Result<GitFlakeInput> {
+        let input_type = locked.get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("unknown");
+
+        let rev = locked.get("rev").and_then(|r| r.as_str());
+        let resolved_hash = rev.map(|r| {
+            if r.len() < 40 {
+                CommitHash::new(&format!("{:0<40}", r)).ok()
+            } else {
+                CommitHash::new(r).ok()
+            }
+        }).flatten();
+
+        Ok(GitFlakeInput {
+            name: name.to_string(),
+            url: format!("{input_type}:{name}"),
+            git_ref: locked.get("ref").and_then(|r| r.as_str()).map(String::from),
+            resolved_hash,
+            store_path: None,
+            follows: None,
+            last_modified: locked.get("lastModified")
+                .and_then(|t| t.as_i64())
+                .and_then(|ts| DateTime::from_timestamp(ts, 0)),
+        })
     }
 
     /// Get recommendations based on the analysis

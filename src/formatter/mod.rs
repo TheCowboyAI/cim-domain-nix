@@ -129,7 +129,7 @@ impl FormatterService {
         cmd.arg(path);
 
         let output = cmd.output().await
-            .map_err(|e| NixDomainError::FormatterError(format!("Failed to run formatter: {}", e)))?;
+            .map_err(|e| NixDomainError::FormatterError(format!("Failed to run formatter: {e}")))?;
 
         Ok(FormattingResult {
             formatted: output.status.success() && !self.check_only,
@@ -263,14 +263,12 @@ impl FormattingReport {
         if self.needs_formatting.is_empty() && self.errors.is_empty() {
             format!("✅ All {} files are properly formatted", self.total_files)
         } else if !self.formatted_files.is_empty() {
-            format!(
-                "Formatted {} files, {} errors",
+            format!("Formatted {} files, {} errors",
                 self.formatted_files.len(),
                 self.errors.len()
             )
         } else {
-            format!(
-                "❌ {} files need formatting, {} errors",
+            format!("❌ {} files need formatting, {} errors",
                 self.needs_formatting.len(),
                 self.errors.len()
             )

@@ -1,8 +1,7 @@
-//! Derivation file parser
+//! Derivation parsing functionality
 
-use crate::{value_objects::Derivation, Result, NixDomainError};
-use rnix::SyntaxNode;
-use std::collections::HashMap;
+use super::NixFile;
+use crate::Result;
 use std::path::PathBuf;
 
 /// A parsed Nix derivation
@@ -23,7 +22,7 @@ pub struct DerivationParser;
 
 impl DerivationParser {
     /// Parse a derivation from a Nix file
-    pub fn parse(file: &NixFile) -> Result<ParsedDerivation> {
+    pub fn parse(_file: &NixFile) -> Result<ParsedDerivation> {
         // TODO: Implement actual parsing logic
         
         Ok(ParsedDerivation {
@@ -33,12 +32,4 @@ impl DerivationParser {
             dependencies: vec![],
         })
     }
-}
-
-/// Nix file representation
-pub struct NixFile {
-    /// File path
-    pub path: PathBuf,
-    /// Parsed syntax tree
-    pub syntax: SyntaxNode,
 } 

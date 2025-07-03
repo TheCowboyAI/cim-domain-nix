@@ -7,19 +7,85 @@ use crate::{Result, NixDomainError};
 use crate::git_integration::{FlakeLockCommit, DependencyChanges, GitFlakeInput};
 use cim_domain_git::value_objects::{CommitHash, AuthorInfo};
 use chrono::{DateTime, Utc};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+/// Cache entry for parsed flake.lock data
+#[derive(Clone)]
+struct CacheEntry<T> {
+    data: T,
+    timestamp: Instant,
+}
+
+/// Configuration for the analyzer
+#[derive(Clone, Debug)]
+pub struct AnalyzerConfig {
+    /// Cache TTL in seconds
+    pub cache_ttl: Duration,
+    /// Maximum number of cached entries
+    pub max_cache_entries: usize,
+    /// Whether to use aggressive caching
+    pub aggressive_caching: bool,
+}
+
+impl Default for AnalyzerConfig {
+    fn default() -> Self {
+        Self {
+            cache_ttl: Duration::from_secs(300), // 5 minutes
+            max_cache_entries: 100,
+            aggressive_caching: false,
+        }
+    }
+}
 
 /// Analyzer for Git-Nix integration
 pub struct GitNixAnalyzer {
-    // Future: Add caching and configuration options
+    /// Configuration for the analyzer
+    config: AnalyzerConfig,
+    /// Cache for parsed flake.lock inputs
+    input_cache: Arc<Mutex<HashMap<String, CacheEntry<HashMap<String, GitFlakeInput>>>>>,
+    /// Cache for file content at commits
+    file_cache: Arc<Mutex<HashMap<(PathBuf, CommitHash, String), CacheEntry<String>>>>,
+    /// Statistics for cache hits/misses
+    stats: Arc<Mutex<AnalyzerStats>>,
+}
+
+#[derive(Default)]
+struct AnalyzerStats {
+    cache_hits: u64,
+    cache_misses: u64,
+    parse_operations: u64,
 }
 
 impl GitNixAnalyzer {
     /// Create a new analyzer
     pub fn new() -> Self {
-        Self {}
+        Self::with_config(AnalyzerConfig::default())
+    }
+
+    /// Create a new analyzer with custom configuration
+    pub fn with_config(config: AnalyzerConfig) -> Self {
+        Self {
+            config,
+            input_cache: Arc::new(Mutex::new(HashMap::new())),
+            file_cache: Arc::new(Mutex::new(HashMap::new())),
+            stats: Arc::new(Mutex::new(AnalyzerStats::default())),
+        }
+    }
+
+    /// Get cache statistics
+    pub fn get_stats(&self) -> (u64, u64, u64) {
+        let stats = self.stats.lock().unwrap();
+        (stats.cache_hits, stats.cache_misses, stats.parse_operations)
+    }
+
+    /// Clear all caches
+    pub fn clear_cache(&self) {
+        self.input_cache.lock().unwrap().clear();
+        self.file_cache.lock().unwrap().clear();
     }
 
     /// Get the history of flake.lock changes
@@ -42,11 +108,11 @@ impl GitNixAnalyzer {
             ]);
 
         if let Some(limit) = limit {
-            cmd.arg(format!("-{}", limit));
+            cmd.arg(format!("-{limit}"));
         }
 
         let output = cmd.output().await
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to get git log: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to get git log: {e}")))?;
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
@@ -85,7 +151,7 @@ impl GitNixAnalyzer {
             ).await?;
 
             let lock_json: serde_json::Value = serde_json::from_str(&lock_content)
-                .map_err(|e| NixDomainError::ParseError(format!("Invalid flake.lock JSON: {}", e)))?;
+                .map_err(|e| NixDomainError::ParseError(format!("Invalid flake.lock JSON: {e}")))?;
 
             commits.push(FlakeLockCommit {
                 commit: commit_hash,
@@ -111,9 +177,9 @@ impl GitNixAnalyzer {
         let to_content = self.get_file_at_commit(repo_path, to_commit, "flake.lock").await?;
 
         let from_json: serde_json::Value = serde_json::from_str(&from_content)
-            .map_err(|e| NixDomainError::ParseError(format!("Invalid from flake.lock: {}", e)))?;
+            .map_err(|e| NixDomainError::ParseError(format!("Invalid from flake.lock: {e}")))?;
         let to_json: serde_json::Value = serde_json::from_str(&to_content)
-            .map_err(|e| NixDomainError::ParseError(format!("Invalid to flake.lock: {}", e)))?;
+            .map_err(|e| NixDomainError::ParseError(format!("Invalid to flake.lock: {e}")))?;
 
         // Parse inputs from both versions
         let from_inputs = self.parse_flake_lock_inputs(&from_json)?;
@@ -157,6 +223,22 @@ impl GitNixAnalyzer {
         commit: &CommitHash,
         file_path: &str,
     ) -> Result<String> {
+        let cache_key = (repo_path.to_path_buf(), commit.clone(), file_path.to_string());
+        
+        // Check cache first
+        if self.config.aggressive_caching {
+            let mut cache = self.file_cache.lock().unwrap();
+            if let Some(entry) = cache.get(&cache_key) {
+                if entry.timestamp.elapsed() < self.config.cache_ttl {
+                    self.stats.lock().unwrap().cache_hits += 1;
+                    return Ok(entry.data.clone());
+                } else {
+                    cache.remove(&cache_key);
+                }
+            }
+            self.stats.lock().unwrap().cache_misses += 1;
+        }
+
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
             .args(&[
@@ -165,7 +247,7 @@ impl GitNixAnalyzer {
             ])
             .output()
             .await
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to get file at commit: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to get file at commit: {e}")))?;
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
@@ -173,11 +255,52 @@ impl GitNixAnalyzer {
             ));
         }
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let content = String::from_utf8_lossy(&output.stdout).to_string();
+        
+        // Cache the result
+        if self.config.aggressive_caching {
+            let mut cache = self.file_cache.lock().unwrap();
+            
+            // Evict old entries if cache is full
+            if cache.len() >= self.config.max_cache_entries {
+                // Simple LRU: remove oldest entry
+                if let Some(oldest_key) = cache.iter()
+                    .min_by_key(|(_, entry)| entry.timestamp)
+                    .map(|(k, _)| k.clone()) {
+                    cache.remove(&oldest_key);
+                }
+            }
+            
+            cache.insert(cache_key, CacheEntry {
+                data: content.clone(),
+                timestamp: Instant::now(),
+            });
+        }
+
+        Ok(content)
     }
 
     /// Parse inputs from flake.lock JSON
     fn parse_flake_lock_inputs(&self, lock_json: &serde_json::Value) -> Result<HashMap<String, GitFlakeInput>> {
+        // Create a cache key from the JSON
+        let cache_key = lock_json.to_string();
+        
+        // Check cache first
+        {
+            let mut cache = self.input_cache.lock().unwrap();
+            if let Some(entry) = cache.get(&cache_key) {
+                if entry.timestamp.elapsed() < self.config.cache_ttl {
+                    self.stats.lock().unwrap().cache_hits += 1;
+                    return Ok(entry.data.clone());
+                } else {
+                    cache.remove(&cache_key);
+                }
+            }
+        }
+        
+        self.stats.lock().unwrap().cache_misses += 1;
+        self.stats.lock().unwrap().parse_operations += 1;
+
         let mut inputs = HashMap::new();
 
         if let Some(nodes) = lock_json.get("nodes").and_then(|n| n.as_object()) {
@@ -193,11 +316,33 @@ impl GitNixAnalyzer {
             }
         }
 
+        // Cache the result
+        {
+            let mut cache = self.input_cache.lock().unwrap();
+            
+            // Evict old entries if cache is full
+            if cache.len() >= self.config.max_cache_entries {
+                if let Some(oldest_key) = cache.iter()
+                    .min_by_key(|(_, entry)| entry.timestamp)
+                    .map(|(k, _)| k.clone()) {
+                    cache.remove(&oldest_key);
+                }
+            }
+            
+            cache.insert(cache_key, CacheEntry {
+                data: inputs.clone(),
+                timestamp: Instant::now(),
+            });
+        }
+
         Ok(inputs)
     }
 
     /// Parse a single locked input
     fn parse_locked_input(&self, name: &str, locked: &serde_json::Value) -> Result<GitFlakeInput> {
+        // Track parsing operations
+        self.stats.lock().unwrap().parse_operations += 1;
+
         let input_type = locked.get("type")
             .and_then(|t| t.as_str())
             .ok_or_else(|| NixDomainError::ParseError("Missing input type".to_string()))?;
@@ -214,7 +359,7 @@ impl GitNixAnalyzer {
 
                 Ok(GitFlakeInput {
                     name: name.to_string(),
-                    url: format!("github:{}/{}", owner, repo),
+                    url: format!("github:{owner}/{repo}"),
                     git_ref: locked.get("ref").and_then(|r| r.as_str()).map(String::from),
                     resolved_hash: rev.map(|r| {
                         // For test purposes, create a CommitHash even if it's short
@@ -259,7 +404,7 @@ impl GitNixAnalyzer {
 
                 Ok(GitFlakeInput {
                     name: name.to_string(),
-                    url: format!("path:{}", path),
+                    url: format!("path:{path}"),
                     git_ref: None,
                     resolved_hash: None,
                     store_path: None,
@@ -269,7 +414,7 @@ impl GitNixAnalyzer {
             }
             _ => Ok(GitFlakeInput {
                 name: name.to_string(),
-                url: format!("{}:{}", input_type, name),
+                url: format!("{input_type}:{name}"),
                 git_ref: None,
                 resolved_hash: None,
                 store_path: None,
@@ -298,7 +443,7 @@ impl GitNixAnalyzer {
             ]);
 
         if let Some(limit) = limit {
-            cmd.arg(format!("-{}", limit));
+            cmd.arg(format!("-{limit}"));
         }
 
         cmd.arg("--");
@@ -311,7 +456,7 @@ impl GitNixAnalyzer {
         }
 
         let output = cmd.output().await
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to get git log: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to get git log: {e}")))?;
 
         if !output.status.success() {
             // If no files match, return empty list

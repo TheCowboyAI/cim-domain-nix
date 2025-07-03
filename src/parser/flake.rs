@@ -2,11 +2,12 @@
 
 use super::NixFile;
 use crate::parser::ast::*;
-use crate::parser::error::{ParseError, ParseErrorKind};
-use crate::value_objects::{FlakeRef, FlakeInputs, FlakeOutputs};
+use crate::value_objects::{FlakeRef, FlakeInputs, FlakeOutputs, Flake};
 use crate::{Result, NixDomainError};
 use rnix::{SyntaxNode, SyntaxKind};
 use std::collections::HashMap;
+use std::path::PathBuf;
+use uuid::Uuid;
 
 /// A parser for Nix flakes
 pub struct FlakeParser;
@@ -171,7 +172,7 @@ impl ParsedFlake {
     pub fn update_input(&mut self, name: &str, new_url: &str) -> Result<()> {
         if !self.inputs.inputs.contains_key(name) {
             return Err(NixDomainError::ValidationError(
-                format!("Input '{}' not found", name)
+                format!("Input '{name}' not found")
             ));
         }
         
@@ -187,7 +188,7 @@ impl ParsedFlake {
     pub fn remove_input(&mut self, name: &str) -> Result<()> {
         if self.inputs.inputs.remove(name).is_none() {
             return Err(NixDomainError::ValidationError(
-                format!("Input '{}' not found", name)
+                format!("Input '{name}' not found")
             ));
         }
         
@@ -223,7 +224,7 @@ impl ParsedFlake {
         if let Some(config) = &self.nix_config {
             content.push_str("\n  nixConfig = {\n");
             for (key, value) in config {
-                content.push_str(&format!("    {} = {};\n", key, value));
+                content.push_str(&format!("    {key} = {value};\n"));
             }
             content.push_str("  };\n");
         }

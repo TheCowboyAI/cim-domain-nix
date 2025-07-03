@@ -2,7 +2,7 @@
 
 use cim_domain_nix::{
     aggregate::FlakeAggregate,
-    commands::{CreateFlake, AddFlakeInput},
+    commands::{AddFlakeInput, CreateFlake},
     value_objects::FlakeRef,
 };
 use std::path::PathBuf;
@@ -94,4 +94,4 @@ fn test_duplicate_input_error() {
     let result = aggregate.handle_add_flake_input(add_cmd);
     assert!(result.is_err());
 }
-*/ 
+*/

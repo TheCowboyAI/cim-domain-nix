@@ -58,6 +58,10 @@ pub struct DependencyAnalyzer;
 
 impl DependencyAnalyzer {
     /// Find all dependencies in a Nix file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if parsing fails or dependency analysis encounters issues
     pub fn find_dependencies(file: &NixFile) -> Result<Vec<DependencyEdge>> {
         let mut dependencies = Vec::new();
 
@@ -80,6 +84,10 @@ impl DependencyAnalyzer {
     }
 
     /// Find dependencies in a flake file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if flake dependency extraction fails
     fn find_flake_dependencies(ast: &SyntaxNode) -> Result<Vec<DependencyEdge>> {
         let mut deps = Vec::new();
 
@@ -97,6 +105,10 @@ impl DependencyAnalyzer {
     }
 
     /// Extract flake inputs as dependencies
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if input extraction fails
     fn extract_flake_inputs(inputs_node: &SyntaxNode) -> Result<Vec<DependencyEdge>> {
         let mut deps = Vec::new();
 
@@ -110,7 +122,7 @@ impl DependencyAnalyzer {
             if trimmed.contains('=') && !trimmed.starts_with('#') {
                 // Extract the key part
                 if let Some(key_part) = trimmed.split('=').next() {
-                    let input_name = key_part.trim().to_string();
+                    let _input_name = key_part.trim().to_string();
                     
                     // Try to extract URL from the value
                     // Look for string nodes in children
@@ -133,6 +145,10 @@ impl DependencyAnalyzer {
     }
 
     /// Find dependencies in a NixOS module
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if module dependency analysis fails
     fn find_module_dependencies(ast: &SyntaxNode) -> Result<Vec<DependencyEdge>> {
         let mut deps = Vec::new();
 
@@ -149,6 +165,10 @@ impl DependencyAnalyzer {
     }
 
     /// Find import statements
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if import statement parsing fails
     fn find_import_dependencies(node: &SyntaxNode) -> Result<Vec<DependencyEdge>> {
         let mut deps = Vec::new();
 
@@ -179,6 +199,10 @@ impl DependencyAnalyzer {
     }
 
     /// Find path references (./foo.nix, ../bar/baz.nix, etc.)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if path reference extraction fails
     fn find_path_dependencies(node: &SyntaxNode) -> Result<Vec<DependencyEdge>> {
         let mut deps = Vec::new();
 
@@ -203,6 +227,10 @@ impl DependencyAnalyzer {
     }
 
     /// Extract imports from a list node
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if import extraction fails
     fn extract_imports(list_node: &SyntaxNode) -> Result<Vec<DependencyEdge>> {
         let mut deps = Vec::new();
 

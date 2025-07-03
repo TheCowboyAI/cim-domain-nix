@@ -54,6 +54,10 @@ impl FlakeAggregate {
     }
 
     /// Handle a command
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command type is unknown
     pub fn handle_command(&mut self, cmd: Box<dyn std::any::Any>) -> Result<Vec<Box<dyn std::any::Any>>> {
         let mut events = Vec::new();
 
@@ -85,6 +89,10 @@ impl FlakeAggregate {
     }
 
     /// Apply an event to the aggregate
+    ///
+    /// # Errors
+    ///
+    /// Currently always returns Ok, but may return errors in the future
     pub fn apply_event(&mut self, event: &dyn std::any::Any) -> Result<()> {
         if let Some(flake_created) = event.downcast_ref::<FlakeCreated>() {
             // Apply flake created event
@@ -126,6 +134,10 @@ pub struct ModuleAggregate {
 
 impl ModuleAggregate {
     /// Create a module
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if module creation fails
     pub fn handle_create_module(cmd: CreateModule) -> Result<(Self, Vec<ModuleCreated>)> {
         let aggregate = Self {
             id: cmd.command_id,
@@ -151,6 +163,10 @@ pub struct OverlayAggregate {
 
 impl OverlayAggregate {
     /// Create an overlay
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if overlay creation fails
     pub fn handle_create_overlay(cmd: CreateOverlay) -> Result<(Self, Vec<OverlayCreated>)> {
         let aggregate = Self {
             id: cmd.command_id,
@@ -182,6 +198,10 @@ pub struct ConfigurationAggregate {
 
 impl ConfigurationAggregate {
     /// Create a configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration creation fails
     pub fn handle_create_configuration(cmd: CreateConfiguration) -> Result<(Self, Vec<ConfigurationCreated>)> {
         let id = Uuid::new_v4();
         let aggregate = Self {
@@ -200,6 +220,10 @@ impl ConfigurationAggregate {
     }
 
     /// Activate a configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration activation fails
     pub fn handle_activate_configuration(&mut self, cmd: ActivateConfiguration) -> Result<Vec<ConfigurationActivated>> {
         self.is_active = true;
         self.current_generation += 1;

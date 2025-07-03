@@ -248,7 +248,7 @@ impl NixAnalyzer {
                 }
                 Err(e) => {
                     // Log error but continue
-                    eprintln!("Failed to parse file: {}", e);
+                    eprintln!("Failed to parse file: {e}");
                 }
             }
         }

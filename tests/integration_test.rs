@@ -3,13 +3,13 @@
 use cim_domain_nix::{
     aggregate::ModuleAggregate,
     commands::CreateModule,
+    events::{ConfigurationCreated, FlakeCreated, PackageBuilt},
+    projections::{ConfigurationProjection, NixProjection, PackageBuildProjection},
     value_objects::*,
-    projections::{NixProjection, PackageBuildProjection, ConfigurationProjection},
-    events::{FlakeCreated, PackageBuilt, ConfigurationCreated},
 };
+use std::collections::HashMap;
 use std::path::PathBuf;
 use uuid::Uuid;
-use std::collections::HashMap;
 
 // TODO: Update these tests to use the actual FlakeAggregate API
 
@@ -58,7 +58,10 @@ fn test_flake_projection() {
 
     // Verify the projection was updated
     assert_eq!(projection.flake_projection.flakes.len(), 1);
-    assert!(projection.flake_projection.flakes_by_path.contains_key(&PathBuf::from("/tmp/test")));
+    assert!(projection
+        .flake_projection
+        .flakes_by_path
+        .contains_key(&PathBuf::from("/tmp/test")));
 }
 
 #[test]
@@ -96,7 +99,7 @@ fn test_attribute_path() {
 fn test_store_path_parsing() {
     let path_str = "/nix/store/abc123-hello-1.0";
     let store_path = StorePath::parse(path_str).unwrap();
-    
+
     assert_eq!(store_path.hash, "abc123");
     assert_eq!(store_path.name, "hello-1.0");
     assert_eq!(store_path.to_string(), path_str);
@@ -162,7 +165,10 @@ fn test_attribute_path_parsing() {
     assert_eq!(path.segments, vec!["nixpkgs", "hello"]);
 
     let complex_path = AttributePath::from_str("nixpkgs.python3Packages.numpy");
-    assert_eq!(complex_path.segments, vec!["nixpkgs", "python3Packages", "numpy"]);
+    assert_eq!(
+        complex_path.segments,
+        vec!["nixpkgs", "python3Packages", "numpy"]
+    );
 }
 
 #[test]
@@ -171,7 +177,10 @@ fn test_flake_ref_construction() {
         .with_revision("nixos-23.11")
         .with_subflake("lib");
 
-    assert_eq!(flake_ref.to_string(), "github:NixOS/nixpkgs/nixos-23.11#lib");
+    assert_eq!(
+        flake_ref.to_string(),
+        "github:NixOS/nixpkgs/nixos-23.11#lib"
+    );
 }
 
 /*
@@ -198,9 +207,9 @@ async fn test_create_and_query_flake() {
 
     let service = NixServiceFactory::create_evaluation_service();
     let info = service.query_flake_info(query).await;
-    
+
     // Since we're in a test environment without actual Nix, this might fail
     // but we're testing the integration pattern
     assert!(info.is_ok() || matches!(info.unwrap_err(), NixDomainError::CommandError(_)));
 }
-*/ 
+*/

@@ -3,7 +3,7 @@ use rnix::{SyntaxKind, SyntaxNode};
 
 fn print_ast(node: &SyntaxNode, indent: usize) {
     let prefix = " ".repeat(indent);
-    println!("{}[{:?}] '{}'", prefix, node.kind(), node.text().to_string().trim());
+    println!("{prefix}[{:?}] '{node.kind(}'"), node.text().to_string().trim());
     
     for child in node.children() {
         print_ast(&child, indent + 2);
@@ -40,19 +40,19 @@ fn find_let_bindings(node: &SyntaxNode) {
                 
                 // Look for bindings in the attr set
                 for attr_child in child.children() {
-                    println!("      Attr child: {:?} = '{}'", attr_child.kind(), attr_child.text().to_string().trim());
+                    println!("      Attr child: {:?} = '{attr_child.kind(}'"), attr_child.text().to_string().trim());
                     
                     if attr_child.kind() == SyntaxKind::NODE_ATTRPATH_VALUE {
                         println!("        Found NODE_ATTRPATH_VALUE");
                         
                         // Look for the identifier
                         for value_child in attr_child.children() {
-                            println!("          Value child: {:?} = '{}'", value_child.kind(), value_child.text());
+                            println!("          Value child: {:?} = '{value_child.kind(}'"), value_child.text());
                             
                             if value_child.kind() == SyntaxKind::NODE_ATTRPATH {
                                 // Look inside the attrpath
                                 for path_child in value_child.children() {
-                                    println!("            Path child: {:?} = '{}'", path_child.kind(), path_child.text());
+                                    println!("            Path child: {:?} = '{path_child.kind(}'"), path_child.text());
                                 }
                             }
                         }

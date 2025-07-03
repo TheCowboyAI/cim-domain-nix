@@ -1,10 +1,8 @@
 //! AST helper functions for working with Nix syntax trees
 
 use rnix::{SyntaxNode, SyntaxKind};
-use std::collections::HashMap;
-use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
-use thiserror::Error;
+use std::path::PathBuf;
 
 /// Represents a parsed Nix expression with full AST information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -463,7 +461,7 @@ pub fn create_attrset(attrs: Vec<(&str, &str)>) -> String {
     let mut result = String::from("{\n");
     
     for (key, value) in attrs {
-        result.push_str(&format!("  {} = {};\n", key, value));
+        result.push_str(&format!("  {key} = {value};\n"));
     }
     
     result.push('}');
@@ -473,7 +471,7 @@ pub fn create_attrset(attrs: Vec<(&str, &str)>) -> String {
 /// Create a new lambda expression
 pub fn create_lambda(params: &[&str], body: &str) -> String {
     let param_str = params.join(": ");
-    format!("{}: {}", param_str, body)
+    format!("{param_str}: {body}")
 }
 
 /// Convert from rnix SyntaxNode to our AST representation
@@ -517,13 +515,13 @@ pub fn from_syntax_node(node: &SyntaxNode) -> Result<NixAst, AstError> {
         SyntaxKind::TOKEN_INTEGER => {
             let text = node.text().to_string();
             let value = text.parse::<i64>()
-                .map_err(|e| AstError::ParseError(format!("Invalid integer: {}", e)))?;
+                .map_err(|e| AstError::ParseError(format!("Invalid integer: {e}")))?;
             Ok(NixAst::Integer(value))
         }
         SyntaxKind::TOKEN_FLOAT => {
             let text = node.text().to_string();
             let value = text.parse::<f64>()
-                .map_err(|e| AstError::ParseError(format!("Invalid float: {}", e)))?;
+                .map_err(|e| AstError::ParseError(format!("Invalid float: {e}")))?;
             Ok(NixAst::Float(value))
         }
         _ => {
@@ -608,13 +606,13 @@ fn parse_literal(node: &SyntaxNode) -> Result<NixAst, AstError> {
             SyntaxKind::TOKEN_INTEGER => {
                 let text = token.text().to_string();
                 let value = text.parse::<i64>()
-                    .map_err(|e| AstError::ParseError(format!("Invalid integer: {}", e)))?;
+                    .map_err(|e| AstError::ParseError(format!("Invalid integer: {e}")))?;
                 Ok(NixAst::Integer(value))
             }
             SyntaxKind::TOKEN_FLOAT => {
                 let text = token.text().to_string();
                 let value = text.parse::<f64>()
-                    .map_err(|e| AstError::ParseError(format!("Invalid float: {}", e)))?;
+                    .map_err(|e| AstError::ParseError(format!("Invalid float: {e}")))?;
                 Ok(NixAst::Float(value))
             }
             _ => {

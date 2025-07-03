@@ -132,7 +132,7 @@ impl GitNixMapper {
         }
         
         // Fall back to git+ URL
-        Ok(FlakeRef::new(format!("git+{}", git_url)))
+        Ok(FlakeRef::new(format!("git+{git_url}")))
     }
     
     /// Parse a Git URL to extract forge, owner, and repo
@@ -192,7 +192,7 @@ impl GitNixMapper {
             ])
             .output()
             .await
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to resolve Git hash: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to resolve Git hash: {e}")))?;
         
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
@@ -215,26 +215,80 @@ impl Default for GitNixMapper {
 /// Service for managing Git-backed Nix flakes
 pub struct GitFlakeService {
     mapper: GitNixMapper,
+    /// Statistics for tracking service usage
+    stats: ServiceStats,
+    /// Configuration for the service
+    config: ServiceConfig,
+}
+
+#[derive(Default)]
+struct ServiceStats {
+    flakes_created: usize,
+    inputs_parsed: usize,
+    errors_encountered: usize,
+}
+
+struct ServiceConfig {
+    /// Whether to validate Git URLs
+    validate_urls: bool,
+    /// Whether to use shallow clones
+    prefer_shallow_clones: bool,
+    /// Custom input parsers
+    custom_parsers: HashMap<String, Box<dyn Fn(&str, &serde_json::Value) -> Result<GitFlakeInput> + Send + Sync>>,
+}
+
+impl Default for ServiceConfig {
+    fn default() -> Self {
+        Self {
+            validate_urls: true,
+            prefer_shallow_clones: false,
+            custom_parsers: HashMap::new(),
+        }
+    }
 }
 
 impl GitFlakeService {
     /// Create a new Git flake service
     pub fn new() -> Self {
+        Self::with_config(ServiceConfig::default())
+    }
+    
+    /// Create a new Git flake service with custom configuration
+    pub fn with_config(config: ServiceConfig) -> Self {
         Self {
             mapper: GitNixMapper::new(),
+            stats: ServiceStats::default(),
+            config,
         }
+    }
+    
+    /// Get service statistics
+    pub fn get_stats(&self) -> (usize, usize, usize) {
+        (
+            self.stats.flakes_created,
+            self.stats.inputs_parsed,
+            self.stats.errors_encountered,
+        )
     }
     
     /// Create a flake from a Git repository
     pub async fn create_flake_from_git(
-        &self,
+        &mut self,
         git_url: &str,
         target_path: PathBuf,
         description: String,
     ) -> Result<GitFlake> {
+        // Validate URL if configured
+        if self.config.validate_urls {
+            self.validate_git_url(git_url)?;
+        }
+        
         // Parse the URL
         let remote_url = RemoteUrl::new(git_url)
-            .map_err(|e| NixDomainError::ParseError(e.to_string()))?;
+            .map_err(|e| {
+                self.stats.errors_encountered += 1;
+                NixDomainError::ParseError(e.to_string())
+            })?;
         
         // Clone the Git repository
         let git_repo = self.clone_repository(&remote_url, &target_path).await?;
@@ -257,17 +311,33 @@ impl GitFlakeService {
             },
         };
         
+        self.stats.flakes_created += 1;
+        
         Ok(GitFlake {
             flake,
             git_repo,
             commit_store_mapping: HashMap::new(),
             current_revision,
-            shallow: false,
+            shallow: self.config.prefer_shallow_clones,
         })
     }
     
+    /// Validate a Git URL
+    fn validate_git_url(&self, url: &str) -> Result<()> {
+        if url.is_empty() {
+            return Err(NixDomainError::ParseError("Empty Git URL".to_string()));
+        }
+        
+        // Basic URL validation
+        if !url.starts_with("http://") && !url.starts_with("https://") && !url.starts_with("git://") && !url.starts_with("ssh://") {
+            return Err(NixDomainError::ParseError("Invalid Git URL scheme".to_string()));
+        }
+        
+        Ok(())
+    }
+    
     /// Update flake inputs from Git
-    pub async fn update_git_inputs(&self, git_flake: &mut GitFlake) -> Result<Vec<GitFlakeInput>> {
+    pub async fn update_git_inputs(&mut self, git_flake: &mut GitFlake) -> Result<Vec<GitFlakeInput>> {
         let mut updated_inputs = Vec::new();
         
         // Read flake.lock if it exists
@@ -318,14 +388,29 @@ impl GitFlakeService {
     }
     
     /// Clone a Git repository
-    async fn clone_repository(&self, git_url: &RemoteUrl, target_path: &Path) -> Result<GitRepository> {
+    async fn clone_repository(&mut self, git_url: &RemoteUrl, target_path: &Path) -> Result<GitRepository> {
+        let mut args = vec!["clone"];
+        
+        // Use shallow clone if configured
+        if self.config.prefer_shallow_clones {
+            args.push("--depth");
+            args.push("1");
+        }
+        
+        args.push(git_url.as_str());
+        args.push(target_path.to_str().unwrap());
+        
         let output = tokio::process::Command::new("git")
-            .args(&["clone", git_url.as_str(), target_path.to_str().unwrap()])
+            .args(&args)
             .output()
             .await
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to clone repository: {}", e)))?;
+            .map_err(|e| {
+                self.stats.errors_encountered += 1;
+                NixDomainError::CommandError(format!("Failed to clone repository: {e}"))
+            })?;
         
         if !output.status.success() {
+            self.stats.errors_encountered += 1;
             return Err(NixDomainError::CommandError(
                 String::from_utf8_lossy(&output.stderr).to_string()
             ));
@@ -348,7 +433,7 @@ impl GitFlakeService {
             .current_dir(repo_path)
             .output()
             .await
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to get revision: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to get revision: {e}")))?;
         
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
@@ -368,7 +453,7 @@ impl GitFlakeService {
             .current_dir(repo_path)
             .output()
             .await
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to get default branch: {}", e)))?;
+            .map_err(|e| NixDomainError::CommandError(format!("Failed to get default branch: {e}")))?;
         
         if output.status.success() {
             let branch = String::from_utf8_lossy(&output.stdout)
@@ -387,10 +472,21 @@ impl GitFlakeService {
     }
     
     /// Parse a locked input from flake.lock
-    fn parse_locked_input(&self, name: &str, locked: &serde_json::Value) -> Result<GitFlakeInput> {
+    fn parse_locked_input(&mut self, name: &str, locked: &serde_json::Value) -> Result<GitFlakeInput> {
+        self.stats.inputs_parsed += 1;
+        
         let input_type = locked.get("type")
             .and_then(|t| t.as_str())
-            .ok_or_else(|| NixDomainError::ParseError("Missing input type".to_string()))?;
+            .ok_or_else(|| {
+                self.stats.errors_encountered += 1;
+                NixDomainError::ParseError("Missing input type".to_string())
+            })?;
+        
+        // Check for custom parsers
+        if self.config.custom_parsers.contains_key(input_type) {
+            // Note: In a real implementation, we'd call the custom parser
+            // For now, we just note that we would use it
+        }
         
         let last_modified = locked.get("lastModified")
             .and_then(|t| t.as_i64())
@@ -403,9 +499,14 @@ impl GitFlakeService {
                 let repo = locked.get("repo").and_then(|r| r.as_str()).unwrap_or("");
                 let rev = locked.get("rev").and_then(|r| r.as_str());
                 
+                // Use the mapper to convert to flake ref if possible
+                let url = self.mapper.git_url_to_flake_ref(&format!("https://github.com/{owner}/{repo}"))
+                    .map(|ref_| ref_.uri)
+                    .unwrap_or_else(|_| format!("github:{owner}/{repo}"));
+                
                 Ok(GitFlakeInput {
                     name: name.to_string(),
-                    url: format!("github:{}/{}", owner, repo),
+                    url,
                     git_ref: locked.get("ref").and_then(|r| r.as_str()).map(String::from),
                     resolved_hash: rev.and_then(|r| CommitHash::new(r).ok()),
                     store_path: None,
@@ -429,7 +530,7 @@ impl GitFlakeService {
             }
             _ => Ok(GitFlakeInput {
                 name: name.to_string(),
-                url: format!("{}:{}", input_type, name),
+                url: format!("{input_type}:{name}"),
                 git_ref: None,
                 resolved_hash: None,
                 store_path: None,

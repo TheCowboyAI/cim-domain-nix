@@ -1,8 +1,7 @@
-//! NixOS module parsing and manipulation
+//! Module parsing functionality
 
-use super::{NixFile, ParseError};
-use crate::{Result, NixDomainError};
-use rnix::SyntaxNode;
+use super::NixFile;
+use crate::Result;
 use std::collections::HashMap;
 use std::path::PathBuf;
 

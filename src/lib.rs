@@ -21,7 +21,7 @@
 //! };
 //! 
 //! let events = handler.handle_command(Box::new(cmd)).await?;
-//! println!("Created flake with {} events", events.len());
+//! println!("Created flake with {events.len(} events"));
 //! # Ok(())
 //! # }
 //! ```

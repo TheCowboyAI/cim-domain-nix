@@ -32,7 +32,7 @@ impl GitConverter {
 impl DotfileConverter for GitConverter {
     fn convert(&self, dotfile_path: &Path) -> Result<ProgramConfig, NixDomainError> {
         let content = fs::read_to_string(dotfile_path)
-            .map_err(|e| NixDomainError::ParseError(format!("Failed to read git config: {}", e)))?;
+            .map_err(|e| NixDomainError::ParseError(format!("Failed to read git config: {e}")))?;
         
         let mut config = ProgramConfig::new(true);
         let mut user_settings = std::collections::HashMap::new();
@@ -109,7 +109,7 @@ impl VimConverter {
 impl DotfileConverter for VimConverter {
     fn convert(&self, dotfile_path: &Path) -> Result<ProgramConfig, NixDomainError> {
         let content = fs::read_to_string(dotfile_path)
-            .map_err(|e| NixDomainError::ParseError(format!("Failed to read vim config: {}", e)))?;
+            .map_err(|e| NixDomainError::ParseError(format!("Failed to read vim config: {e}")))?;
         
         let mut config = ProgramConfig::new(true);
         
@@ -163,7 +163,7 @@ impl ZshConverter {
 impl DotfileConverter for ZshConverter {
     fn convert(&self, dotfile_path: &Path) -> Result<ProgramConfig, NixDomainError> {
         let content = fs::read_to_string(dotfile_path)
-            .map_err(|e| NixDomainError::ParseError(format!("Failed to read zsh config: {}", e)))?;
+            .map_err(|e| NixDomainError::ParseError(format!("Failed to read zsh config: {e}")))?;
         
         let mut config = ProgramConfig::new(true);
         
@@ -241,7 +241,7 @@ impl TmuxConverter {
 impl DotfileConverter for TmuxConverter {
     fn convert(&self, dotfile_path: &Path) -> Result<ProgramConfig, NixDomainError> {
         let content = fs::read_to_string(dotfile_path)
-            .map_err(|e| NixDomainError::ParseError(format!("Failed to read tmux config: {}", e)))?;
+            .map_err(|e| NixDomainError::ParseError(format!("Failed to read tmux config: {e}")))?;
         
         let mut config = ProgramConfig::new(true);
         

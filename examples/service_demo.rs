@@ -40,7 +40,7 @@ async fn demo_development_service(factory: &NixServiceFactory) -> Result<(), Box
         "My awesome Rust application".to_string(),
     ).await?;
 
-    println!("   ✓ Created project with flake ID: {}", flake_id);
+    println!("   ✓ Created project with flake ID: {flake_id}");
 
     // Add a dependency
     println!("\n2. Adding dependency...");
@@ -56,17 +56,17 @@ async fn demo_development_service(factory: &NixServiceFactory) -> Result<(), Box
     println!("\n3. Building project...");
     match dev_service.build_and_test(project_path.clone()).await {
         Ok(report) => {
-            println!("   ✓ Build {}", if report.success { "succeeded" } else { "failed" });
+            println!("   ✓ Build {if report.success { "succeeded" } else { "failed" }}");
             println!("   ✓ Outputs: {:?}", report.outputs);
         }
         Err(e) => {
-            println!("   ⚠ Build failed (expected in demo): {}", e);
+            println!("   ⚠ Build failed (expected in demo): {e}");
         }
     }
 
     // Keep the directory for inspection
     let path = temp_dir.into_path();
-    println!("\n   📁 Project created at: {}", path.display());
+    println!("\n   📁 Project created at: {path.display(}"));
 
     Ok(())
 }
@@ -81,17 +81,14 @@ async fn demo_package_service(factory: &NixServiceFactory) -> Result<(), Box<dyn
     println!("\n1. Searching for 'hello' packages...");
     match pkg_service.search_packages("hello".to_string(), Some(5)).await {
         Ok(results) => {
-            println!("   ✓ Found {} packages:", results.len());
+            println!("   ✓ Found {results.len(} packages:"));
             for (i, pkg) in results.iter().enumerate() {
-                println!("     {}. {} - {}", 
-                    i + 1, 
-                    pkg.name, 
-                    pkg.description.as_deref().unwrap_or("No description")
+                println!("     {i + 1}. {pkg.name} - {pkg.description.as_deref(}").unwrap_or("No description")
                 );
             }
         }
         Err(e) => {
-            println!("   ⚠ Search failed (nixpkgs might not be available): {}", e);
+            println!("   ⚠ Search failed (nixpkgs might not be available): {e}");
         }
     }
 
@@ -102,10 +99,10 @@ async fn demo_package_service(factory: &NixServiceFactory) -> Result<(), Box<dyn
 
     match pkg_service.build_package("hello", Some(output_path.clone())).await {
         Ok(path) => {
-            println!("   ✓ Package built at: {}", path.display());
+            println!("   ✓ Package built at: {path.display(}"));
         }
         Err(e) => {
-            println!("   ⚠ Build failed (nix might not be available): {}", e);
+            println!("   ⚠ Build failed (nix might not be available): {e}");
         }
     }
 
@@ -117,7 +114,7 @@ async fn demo_package_service(factory: &NixServiceFactory) -> Result<(), Box<dyn
             println!("   ✓ Freed {:.2} MB", freed_mb);
         }
         Err(e) => {
-            println!("   ⚠ Garbage collection failed: {}", e);
+            println!("   ⚠ Garbage collection failed: {e}");
         }
     }
 
@@ -140,13 +137,13 @@ async fn demo_configuration_service(factory: &NixServiceFactory) -> Result<(), B
         vec![],
     ).await?;
 
-    println!("   ✓ Created configuration with ID: {}", config_id);
+    println!("   ✓ Created configuration with ID: {config_id}");
 
     // Test configuration
     println!("\n2. Testing configuration...");
     match config_service.test_configuration("demo-config".to_string()).await {
         Ok(_) => println!("   ✓ Configuration test passed"),
-        Err(e) => println!("   ⚠ Configuration test failed: {}", e),
+        Err(e) => println!("   ⚠ Configuration test failed: {e}"),
     }
 
     Ok(())

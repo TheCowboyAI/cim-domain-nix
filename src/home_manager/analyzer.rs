@@ -240,7 +240,7 @@ impl HomeManagerAnalyzer {
                     if !config.programs.contains_key(&dep) && !config.home_packages.contains(&dep) {
                         conflicts.push(ConflictInfo {
                             conflict_type: ConflictType::MissingDependency,
-                            description: format!("{} requires {} but it's not configured", name, dep),
+                            description: format!("{name} requires {dep} but it's not configured"),
                             affected_items: vec![name.clone(), dep],
                         });
                     }
@@ -261,7 +261,7 @@ impl HomeManagerAnalyzer {
             if !config.programs.contains_key(program) {
                 suggestions.push(Suggestion {
                     suggestion_type: SuggestionType::EnableProgram,
-                    description: format!("Consider enabling {} for improved productivity", program),
+                    description: format!("Consider enabling {program} for improved productivity"),
                     priority: Priority::Low,
                 });
             }
@@ -283,7 +283,7 @@ impl HomeManagerAnalyzer {
             if !program.enabled && !program.settings.is_empty() {
                 suggestions.push(Suggestion {
                     suggestion_type: SuggestionType::DisableUnusedProgram,
-                    description: format!("{} has configuration but is disabled", name),
+                    description: format!("{name} has configuration but is disabled"),
                     priority: Priority::Low,
                 });
             }
@@ -298,10 +298,10 @@ impl HomeManagerAnalyzer {
         
         // Scan for common dotfiles
         let entries = fs::read_dir(dotfiles_dir)
-            .map_err(|e| NixDomainError::ParseError(format!("Failed to read directory: {}", e)))?;
+            .map_err(|e| NixDomainError::ParseError(format!("Failed to read directory: {e}")))?;
         
         for entry in entries {
-            let entry = entry.map_err(|e| NixDomainError::ParseError(format!("Failed to read entry: {}", e)))?;
+            let entry = entry.map_err(|e| NixDomainError::ParseError(format!("Failed to read entry: {e}")))?;
             let path = entry.path();
             
             if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
@@ -326,7 +326,7 @@ impl HomeManagerAnalyzer {
                     }
                     _ => {
                         // Add as raw file mapping
-                        let target = PathBuf::from(format!(".{}", file_name));
+                        let target = PathBuf::from(format!(".{file_name}"));
                         config.add_file_mapping(path.clone(), target);
                     }
                 }

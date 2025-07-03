@@ -246,7 +246,7 @@ impl DeadCodeAnalyzer {
                                 let name = ident.text().to_string();
                                 dead_code.push(DeadCode {
                                     code_type: DeadCodeType::UnreachableCode,
-                                    name: format!("binding '{}'", name),
+                                    name: format!("binding '{name}'"),
                                     file: file.as_ref().map(|p| p.display().to_string()),
                                     line: None,
                                     context: Some("Code after throw/abort is unreachable".to_string()),
@@ -334,7 +334,7 @@ impl DeadCodeAnalyzer {
     }
 
     /// Find unused files using the dependency graph
-    fn find_unused_files(files: &[NixFile], graph: &DependencyGraph) -> Result<Vec<DeadCode>> {
+    fn find_unused_files(_files: &[NixFile], graph: &DependencyGraph) -> Result<Vec<DeadCode>> {
         let mut dead_code = Vec::new();
 
         // Find files with no incoming edges (not imported by anything)

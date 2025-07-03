@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
     let flake_path = temp_dir.path().to_path_buf();
 
-    println!("Creating flake in: {}", flake_path.display());
+    println!("Creating flake in: {flake_path.display(}"));
 
     // Create the handler
     let handler = NixCommandHandler::new();
@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Handle the command
     let events = handler.handle_command(Box::new(cmd)).await?;
 
-    println!("Generated {} events", events.len());
+    println!("Generated {events.len(} events"));
 
     // Print event details
     for event in &events {
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Keep the directory around so we can inspect it
     let path = temp_dir.into_path();
-    println!("\nFlake created at: {}", path.display());
+    println!("\nFlake created at: {path.display(}"));
     println!("You can inspect the flake.nix file there.");
 
     Ok(())

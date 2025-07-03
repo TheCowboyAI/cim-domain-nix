@@ -3,7 +3,6 @@
 use crate::commands::{CreateFlake, UpdateFlake, BuildPackage};
 use crate::handlers::NixCommandHandler;
 use crate::aggregate::FlakeAggregate;
-use crate::NixDomainError;
 use cim_domain::{
     Command, CommandHandler, CommandAcknowledgment, CommandStatus,
     EntityId, CommandEnvelope

@@ -129,17 +129,11 @@ impl SecurityAnalyzer {
                         issues.push(SecurityIssue {
                             issue_type: SecurityIssueType::InsecureFetcher,
                             severity: Severity::High,
-                            description: format!(
-                                "Using {} without a hash allows arbitrary code changes",
-                                fetcher
-                            ),
+                            description: format!("Using {fetcher} without a hash allows arbitrary code changes"),
                             file: file.as_ref().map(|p| p.display().to_string()),
                             line: None, // TODO: Extract line info
                             column: None,
-                            suggestion: Some(format!(
-                                "Add a sha256 or hash attribute to the {} call",
-                                fetcher
-                            )),
+                            suggestion: Some(format!("Add a sha256 or hash attribute to the {fetcher} call")),
                         });
                     }
                 }
@@ -178,7 +172,7 @@ impl SecurityAnalyzer {
                 issues.push(SecurityIssue {
                     issue_type: SecurityIssueType::ImpureFunction,
                     severity: Severity::Medium,
-                    description: format!("{}: {}", func, desc),
+                    description: format!("{func}: {desc}"),
                     file: file.as_ref().map(|p| p.display().to_string()),
                     line: None,
                     column: None,

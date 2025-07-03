@@ -2,9 +2,8 @@
 
 use std::any::Any;
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration};
+use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration, FlakeRef, NixExpression};
 use crate::events::ActivationType;
 use crate::aggregate::FlakeAggregate;
 

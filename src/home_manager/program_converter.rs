@@ -42,7 +42,7 @@ impl ProgramConverter {
     pub fn convert(&self, program: &str, dotfile: &Path) -> Result<ProgramConfig, NixDomainError> {
         self.converters
             .get(program)
-            .ok_or_else(|| NixDomainError::ParseError(format!("No converter for program: {}", program)))?
+            .ok_or_else(|| NixDomainError::ParseError(format!("No converter for program: {program}")))?
             .convert(dotfile)
     }
     
@@ -56,10 +56,7 @@ impl ProgramConverter {
             }
         }
         
-        Err(NixDomainError::ParseError(format!(
-            "No converter found for file: {}",
-            dotfile.display()
-        )))
+        Err(NixDomainError::ParseError(format!("No converter found for file: {}", dotfile.display())))
     }
     
     /// Register a custom converter

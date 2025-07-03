@@ -20,19 +20,19 @@ async fn main() -> anyhow::Result<()> {
 
     // Check if this is a Git repository
     if !repo_path.join(".git").exists() {
-        eprintln!("❌ Not a Git repository: {}", repo_path.display());
+        eprintln!("❌ Not a Git repository: {repo_path.display(}"));
         eprintln!("   Please run this from a Git repository with a flake.lock file");
         return Ok(());
     }
 
     // Check if flake.lock exists
     if !repo_path.join("flake.lock").exists() {
-        eprintln!("❌ No flake.lock found in: {}", repo_path.display());
+        eprintln!("❌ No flake.lock found in: {repo_path.display(}"));
         eprintln!("   This demo requires a Nix flake with a flake.lock file");
         return Ok(());
     }
 
-    println!("📂 Analyzing repository: {}\n", repo_path.display());
+    println!("📂 Analyzing repository: {repo_path.display(}\n"));
 
     // Create analyzer
     let analyzer = GitNixAnalyzer::new();
@@ -45,21 +45,19 @@ async fn main() -> anyhow::Result<()> {
             if commits.is_empty() {
                 println!("No flake.lock commits found in history");
             } else {
-                println!("Found {} flake.lock commits (showing up to 10):\n", commits.len());
+                println!("Found {commits.len(} flake.lock commits (showing up to 10):\n"));
                 
                 for (i, commit) in commits.iter().enumerate() {
-                    println!("{}. {} - {}", 
-                        i + 1,
-                        commit.timestamp.format("%Y-%m-%d %H:%M"),
+                    println!("{i + 1}. {commit.timestamp.format("%Y-%m-%d %H:%M"} - {}"),
                         commit.commit.short()
                     );
-                    println!("   Author: {}", commit.author);
-                    println!("   Message: {}", commit.message);
+                    println!("   Author: {commit.author}");
+                    println!("   Message: {commit.message}");
                     
                     // Count inputs
                     if let Some(nodes) = commit.lock_content.get("nodes").and_then(|n| n.as_object()) {
                         let input_count = nodes.len() - 1; // Exclude "root"
-                        println!("   Inputs: {} dependencies locked", input_count);
+                        println!("   Inputs: {input_count} dependencies locked");
                     }
                     println!();
                 }
@@ -72,41 +70,40 @@ async fn main() -> anyhow::Result<()> {
                 println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                 
                 println!("\n📊 Overall Statistics:");
-                println!("   Total commits: {}", analysis.total_commits);
+                println!("   Total commits: {analysis.total_commits}");
                 if let Some(span) = analysis.time_span {
-                    println!("   Time span: {} days", span.num_days());
+                    println!("   Time span: {span.num_days(} days"));
                 }
                 println!("   Avg commits/month: {:.1}", analysis.update_patterns.avg_commits_per_month);
 
                 println!("\n🔥 Most Updated Inputs:");
                 for (name, count) in analysis.most_updated_inputs.iter().take(5) {
-                    println!("   {} - {} updates", name, count);
+                    println!("   {name} - {count} updates");
                 }
 
                 if !analysis.stale_inputs.is_empty() {
                     println!("\n⚠️  Stale Inputs (>30 days):");
                     for stale in &analysis.stale_inputs {
-                        println!("   {} - {} days since update", stale.name, stale.days_stale);
+                        println!("   {stale.name} - {stale.days_stale} days since update");
                     }
                 }
 
                 println!("\n📅 Update Patterns:");
                 if let Some(day) = analysis.update_patterns.most_active_day {
                     let days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-                    println!("   Most active day: {}", days[day as usize]);
+                    println!("   Most active day: {days[day as usize]}");
                 }
                 if let Some(hour) = analysis.update_patterns.most_active_hour {
-                    println!("   Most active hour: {}:00", hour);
+                    println!("   Most active hour: {hour}:00");
                 }
                 
                 if !analysis.update_patterns.batch_updates.is_empty() {
                     println!("\n🎯 Batch Updates Detected:");
                     for batch in analysis.update_patterns.batch_updates.iter().take(3) {
-                        println!("   {} - {} inputs updated together",
-                            batch.timestamp.format("%Y-%m-%d"),
+                        println!("   {batch.timestamp.format("%Y-%m-%d"} - {} inputs updated together"),
                             batch.inputs_updated
                         );
-                        println!("     {}", batch.input_names.join(", "));
+                        println!("     {batch.input_names.join(", "}"));
                     }
                 }
 
@@ -115,13 +112,13 @@ async fn main() -> anyhow::Result<()> {
                 if !recommendations.is_empty() {
                     println!("\n💡 Recommendations:");
                     for rec in recommendations {
-                        println!("   {}", rec);
+                        println!("   {rec}");
                     }
                 }
             }
         }
         Err(e) => {
-            eprintln!("Error analyzing flake.lock history: {}", e);
+            eprintln!("Error analyzing flake.lock history: {e}");
         }
     }
 
@@ -131,8 +128,8 @@ async fn main() -> anyhow::Result<()> {
         let to_commit = args.get(4).map(|s| s.as_str()).unwrap_or("HEAD");
 
         println!("\n\n🔄 Comparing dependency changes:");
-        println!("   From: {}", from_commit);
-        println!("   To: {}\n", to_commit);
+        println!("   From: {from_commit}");
+        println!("   To: {to_commit}\n");
 
         match (CommitHash::new(from_commit), CommitHash::new(to_commit)) {
             (Ok(from), Ok(to)) => {
@@ -141,23 +138,23 @@ async fn main() -> anyhow::Result<()> {
                         if !changes.added.is_empty() {
                             println!("➕ Added inputs:");
                             for input in &changes.added {
-                                println!("   {} ({})", input.name, input.url);
+                                println!("   {input.name} ({input.url})");
                             }
                         }
 
                         if !changes.removed.is_empty() {
                             println!("\n➖ Removed inputs:");
                             for input in &changes.removed {
-                                println!("   {} ({})", input.name, input.url);
+                                println!("   {input.name} ({input.url})");
                             }
                         }
 
                         if !changes.updated.is_empty() {
                             println!("\n🔄 Updated inputs:");
                             for (old, new) in &changes.updated {
-                                println!("   {}", new.name);
+                                println!("   {new.name}");
                                 if let (Some(old_hash), Some(new_hash)) = (&old.resolved_hash, &new.resolved_hash) {
-                                    println!("     {} → {}", old_hash.short(), new_hash.short());
+                                    println!("     {old_hash.short(} → {}"), new_hash.short());
                                 }
                             }
                         }
@@ -166,7 +163,7 @@ async fn main() -> anyhow::Result<()> {
                             println!("No dependency changes between these commits");
                         }
                     }
-                    Err(e) => eprintln!("Error analyzing changes: {}", e),
+                    Err(e) => eprintln!("Error analyzing changes: {e}"),
                 }
             }
             _ => eprintln!("Invalid commit hashes provided"),
@@ -183,11 +180,10 @@ async fn main() -> anyhow::Result<()> {
                 println!("No Nix file changes found");
             } else {
                 for change in changes.iter().take(5) {
-                    println!("\n{} - {}",
-                        change.timestamp.format("%Y-%m-%d %H:%M"),
+                    println!("\n{change.timestamp.format("%Y-%m-%d %H:%M"} - {}"),
                         change.commit.short()
                     );
-                    println!("Author: {}", change.author);
+                    println!("Author: {change.author}");
                     println!("Files changed:");
                     for file in &change.files {
                         let symbol = match file.change_type {
@@ -196,12 +192,12 @@ async fn main() -> anyhow::Result<()> {
                             cim_domain_nix::git_integration::analyzer::FileChangeType::Deleted => "🗑️",
                             cim_domain_nix::git_integration::analyzer::FileChangeType::Renamed => "📋",
                         };
-                        println!("  {} {}", symbol, file.path);
+                        println!("  {symbol} {file.path}");
                     }
                 }
             }
         }
-        Err(e) => eprintln!("Error analyzing Nix file changes: {}", e),
+        Err(e) => eprintln!("Error analyzing Nix file changes: {e}"),
     }
 
     println!("\n✅ Analysis complete!");

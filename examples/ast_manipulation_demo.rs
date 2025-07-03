@@ -114,13 +114,13 @@ fn main() {
         matches!(node, NixAst::Integer(_))
     });
     
-    println!("Found {} integer nodes", integers.len());
+    println!("Found {integers.len(} integer nodes"));
     
     let strings = AstManipulator::find_nodes(&complex_ast, &|node| {
         matches!(node, NixAst::String(_))
     });
     
-    println!("Found {} string nodes", strings.len());
+    println!("Found {strings.len(} string nodes"));
     
     println!("\n=== Demo Complete ===");
 } 

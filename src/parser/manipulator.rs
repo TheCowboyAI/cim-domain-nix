@@ -1,11 +1,8 @@
 //! AST manipulation utilities for modifying Nix expressions
 
-use std::collections::HashMap;
-use crate::Result;
-use super::ast::{
-    NixAst, FunctionParam, AttrPath, AttrPathSegment,
-    Binding, BindingValue, BinaryOperator
-};
+use super::ast::*;
+use crate::{Result, NixDomainError};
+use rnix::{SyntaxNode, SyntaxKind, SyntaxElement};
 
 /// AST manipulator for transforming Nix expressions
 pub struct AstManipulator;

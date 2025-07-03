@@ -175,10 +175,10 @@ impl PerformanceAnalyzer {
             issues.push(PerformanceIssue {
                 issue_type: PerformanceIssueType::ExcessiveRecursion,
                 impact,
-                description: format!("Deep recursion detected (depth: {})", depth),
+                description: format!("Deep recursion detected (depth: {depth})"),
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
-                cost_estimate: Some(format!("Exponential evaluation cost at depth {}", depth)),
+                cost_estimate: Some(format!("Exponential evaluation cost at depth {depth}")),
                 suggestion: Some("Consider using builtins.foldl' or iterative approaches".to_string()),
             });
         }
@@ -260,7 +260,7 @@ impl PerformanceAnalyzer {
             issues.push(PerformanceIssue {
                 issue_type: PerformanceIssueType::InefficientStringConcat,
                 impact,
-                description: format!("Many string concatenations ({} found)", concat_count),
+                description: format!("Many string concatenations ({concat_count} found)"),
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 cost_estimate: Some("O(n²) string building complexity".to_string()),
@@ -341,7 +341,7 @@ impl PerformanceAnalyzer {
             issues.push(PerformanceIssue {
                 issue_type: PerformanceIssueType::DeepAttributeAccess,
                 impact,
-                description: format!("Deep attribute access (depth: {})", depth),
+                description: format!("Deep attribute access (depth: {depth})"),
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 cost_estimate: Some("Each level requires lookup".to_string()),

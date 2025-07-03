@@ -109,11 +109,6 @@ impl AttributePath {
             segments: path.split('.').map(String::from).collect(),
         }
     }
-
-    /// Convert to a dot-separated string
-    #[must_use] pub fn to_string(&self) -> String {
-        self.segments.join(".")
-    }
 }
 
 impl std::fmt::Display for AttributePath {
@@ -225,11 +220,6 @@ impl StorePath {
             hash: parts[0].to_string(),
             name: parts[1].to_string(),
         })
-    }
-
-    /// Convert back to a string
-    #[must_use] pub fn to_string(&self) -> String {
-        format!("/nix/store/{}-{}", self.hash, self.name)
     }
 }
 

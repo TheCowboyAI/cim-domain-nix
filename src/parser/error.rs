@@ -42,10 +42,9 @@ impl ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(pos) = &self.position {
-            write!(f, "{}:{}: {}", pos.line, pos.column, self.message)
-        } else {
-            write!(f, "{}", self.message)
+        match &self.position {
+            Some(pos) => write!(f, "{}:{}: {}", pos.line, pos.column, self.message),
+            None => write!(f, "{}", self.message),
         }
     }
 }
