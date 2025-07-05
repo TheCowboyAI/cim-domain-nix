@@ -235,7 +235,9 @@ impl FlakeLockTracker {
                         },
                         Some(prev) => {
                             // Existing input - check if hash changed
-                            if prev.resolved_hash != current_input.resolved_hash {
+                            if prev.resolved_hash == current_input.resolved_hash {
+                                false
+                            } else {
                                 stats.update_count += 1;
                                 stats.last_updated = Some(commit.timestamp);
                                 
@@ -248,8 +250,6 @@ impl FlakeLockTracker {
                                     to_hash: current_input.resolved_hash.clone(),
                                 });
                                 true
-                            } else {
-                                false
                             }
                         }
                     };
@@ -316,7 +316,7 @@ impl FlakeLockTracker {
                             self.stats.errors_encountered += 1;
                             if self.config.track_parse_errors {
                                 self.parse_errors.push(ParseError {
-                                    commit: CommitHash::new(&format!("{:0<40}", "unknown")).unwrap(),
+                                    commit: CommitHash::new(format!("{:0<40}", "unknown")).unwrap(),
                                     input_name: normalized_name,
                                     error: e.to_string(),
                                 });
@@ -349,7 +349,7 @@ impl FlakeLockTracker {
             // In real usage, this would be a full hash
             if r.len() < 40 {
                 // Pad with zeros for testing
-                CommitHash::new(&format!("{:0<40}", r)).ok()
+                CommitHash::new(format!("{r:0<40}")).ok()
             } else {
                 CommitHash::new(r).ok()
             }
@@ -363,7 +363,7 @@ impl FlakeLockTracker {
             store_path: None,
             follows: None,
             last_modified: locked.get("lastModified")
-                .and_then(|t| t.as_i64())
+                .and_then(serde_json::Value::as_i64)
                 .and_then(|ts| DateTime::from_timestamp(ts, 0)),
         })
     }
@@ -436,8 +436,8 @@ impl FlakeLockTracker {
         };
 
         // Find most active day and hour
-        let mut day_counts = vec![0u32; 7];
-        let mut hour_counts = vec![0u32; 24];
+        let mut day_counts = [0u32; 7];
+        let mut hour_counts = [0u32; 24];
         
         for commit in &self.commits {
             let day = commit.timestamp.weekday().num_days_from_sunday();
@@ -550,13 +550,13 @@ impl FlakeLockTracker {
             .unwrap_or("unknown");
 
         let rev = locked.get("rev").and_then(|r| r.as_str());
-        let resolved_hash = rev.map(|r| {
+        let resolved_hash = rev.and_then(|r| {
             if r.len() < 40 {
-                CommitHash::new(&format!("{:0<40}", r)).ok()
+                CommitHash::new(format!("{r:0<40}")).ok()
             } else {
                 CommitHash::new(r).ok()
             }
-        }).flatten();
+        });
 
         Ok(GitFlakeInput {
             name: name.to_string(),
@@ -566,7 +566,7 @@ impl FlakeLockTracker {
             store_path: None,
             follows: None,
             last_modified: locked.get("lastModified")
-                .and_then(|t| t.as_i64())
+                .and_then(serde_json::Value::as_i64)
                 .and_then(|ts| DateTime::from_timestamp(ts, 0)),
         })
     }

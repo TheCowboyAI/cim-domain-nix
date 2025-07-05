@@ -85,10 +85,16 @@ pub struct AnalysisReport {
     pub performance_issues: Vec<PerformanceIssue>,
     /// Dead code found
     pub dead_code: Vec<DeadCode>,
-    /// Formatting issues (if check_formatting is enabled)
+    /// Formatting issues (if `check_formatting` is enabled)
     pub formatting_issues: Option<Vec<String>>,
     /// Analysis duration
     pub duration: Duration,
+}
+
+impl Default for NixAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NixAnalyzer {
@@ -140,10 +146,10 @@ impl NixAnalyzer {
                 let service = FormatterService::check_only(formatter);
                 let report = service.format_directory(repo_path).await?;
                 
-                if !report.all_formatted() {
-                    Some(report.needs_formatting)
-                } else {
+                if report.all_formatted() {
                     Some(Vec::new())
+                } else {
+                    Some(report.needs_formatting)
                 }
             } else {
                 None
@@ -214,7 +220,7 @@ impl NixAnalyzer {
             .any(|pattern| {
                 if pattern.contains('*') {
                     // Simple glob matching
-                    let pattern = pattern.replace("*", "");
+                    let pattern = pattern.replace('*', "");
                     file_name.starts_with(&pattern) || file_name.ends_with(&pattern)
                 } else {
                     file_name == pattern

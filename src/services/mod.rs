@@ -1,13 +1,11 @@
 //! Domain services for Nix operations
 
-use crate::aggregate::FlakeAggregate;
 use crate::commands::{CreateFlake, AddFlakeInput};
 use crate::{Result, NixDomainError};
-use async_trait::async_trait;
 use std::path::PathBuf;
 use uuid::Uuid;
 use crate::{
-    commands::{BuildPackage, EvaluateExpression, UpdateFlake, RunGarbageCollection, CreateConfiguration, ActivateConfiguration, CheckFlake, DevelopFlake},
+    commands::{BuildPackage, RunGarbageCollection, CreateConfiguration, ActivateConfiguration, CheckFlake, DevelopFlake},
     events::{FlakeCreated, PackageBuilt, ActivationType, ConfigurationActivated, GarbageCollected},
     handlers::NixCommandHandler,
     projections::NixProjection,

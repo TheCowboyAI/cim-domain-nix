@@ -1,8 +1,7 @@
 //! AST manipulation utilities for modifying Nix expressions
 
-use super::ast::*;
-use crate::{Result, NixDomainError};
-use rnix::{SyntaxNode, SyntaxKind, SyntaxElement};
+use super::ast::{NixAst, AttrPath, AttrPathSegment, Binding, BindingValue, FunctionParam, BinaryOperator};
+use crate::Result;
 
 /// AST manipulator for transforming Nix expressions
 pub struct AstManipulator;
@@ -339,10 +338,10 @@ impl AstManipulator {
                 for binding in bindings {
                     match &mut binding.value {
                         BindingValue::Value(v) => {
-                            Self::replace_nodes_recursive(v, predicate, replacer, count)?
+                            Self::replace_nodes_recursive(v, predicate, replacer, count)?;
                         }
                         BindingValue::Inherit { from: Some(f), .. } => {
-                            Self::replace_nodes_recursive(f, predicate, replacer, count)?
+                            Self::replace_nodes_recursive(f, predicate, replacer, count)?;
                         }
                         _ => {}
                     }
@@ -362,11 +361,8 @@ impl AstManipulator {
             }
             NixAst::Let { bindings, body } => {
                 for binding in bindings {
-                    match &mut binding.value {
-                        BindingValue::Value(v) => {
-                            Self::replace_nodes_recursive(v, predicate, replacer, count)?
-                        }
-                        _ => {}
+                    if let BindingValue::Value(v) = &mut binding.value {
+                        Self::replace_nodes_recursive(v, predicate, replacer, count)?;
                     }
                 }
                 Self::replace_nodes_recursive(body, predicate, replacer, count)?;
@@ -453,6 +449,12 @@ impl AstManipulator {
 /// Builder for constructing Nix AST nodes
 pub struct AstBuilder {
     current: Option<NixAst>,
+}
+
+impl Default for AstBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AstBuilder {

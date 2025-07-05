@@ -144,7 +144,7 @@ impl DependencyAnalyzer {
         Ok(deps)
     }
 
-    /// Find dependencies in a NixOS module
+    /// Find dependencies in a `NixOS` module
     ///
     /// # Errors
     ///

@@ -29,6 +29,12 @@ pub struct HomeConfiguration {
     pub home_state_version: String,
 }
 
+impl Default for HomeConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HomeConfiguration {
     /// Create a new empty Home Manager configuration
     pub fn new() -> Self {

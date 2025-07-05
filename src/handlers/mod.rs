@@ -240,7 +240,7 @@ impl PackageCommandHandler {
         let mut args = vec!["build"];
         
         // Create the flake URI with attribute
-        let flake_uri = format!("{}#{}", cmd.flake_ref, cmd.attribute.to_string());
+        let flake_uri = format!("{}#{}", cmd.flake_ref, cmd.attribute);
         args.push(&flake_uri);
 
         // Add output path if specified

@@ -32,13 +32,13 @@ impl Command for NixCommandWrapper {
     }
 }
 
-/// CQRS handler for CreateFlake command
+/// CQRS handler for `CreateFlake` command
 pub struct CreateFlakeHandler {
     nix_handler: Arc<NixCommandHandler>,
 }
 
 impl CreateFlakeHandler {
-    /// Create a new CreateFlake handler
+    /// Create a new `CreateFlake` handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
         Self {
             nix_handler,
@@ -59,13 +59,13 @@ impl CommandHandler<CreateFlake> for CreateFlakeHandler {
     }
 }
 
-/// CQRS handler for UpdateFlake command
+/// CQRS handler for `UpdateFlake` command
 pub struct UpdateFlakeHandler {
     nix_handler: Arc<NixCommandHandler>,
 }
 
 impl UpdateFlakeHandler {
-    /// Create a new UpdateFlake handler
+    /// Create a new `UpdateFlake` handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
         Self {
             nix_handler,
@@ -85,13 +85,13 @@ impl CommandHandler<UpdateFlake> for UpdateFlakeHandler {
     }
 }
 
-/// CQRS handler for BuildPackage command
+/// CQRS handler for `BuildPackage` command
 pub struct BuildPackageHandler {
     nix_handler: Arc<NixCommandHandler>,
 }
 
 impl BuildPackageHandler {
-    /// Create a new BuildPackage handler
+    /// Create a new `BuildPackage` handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
         Self {
             nix_handler,

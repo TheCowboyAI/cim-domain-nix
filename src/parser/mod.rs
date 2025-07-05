@@ -89,7 +89,7 @@ impl NixFile {
         Ok(self.content.clone())
     }
     
-    /// Parse to our NixAst representation
+    /// Parse to our `NixAst` representation
     pub fn to_ast(&self) -> Result<NixAst> {
         ast::from_syntax_node(&self.ast)
             .map_err(|e| NixDomainError::ParseError(e.to_string()))
@@ -101,13 +101,13 @@ impl NixFile {
 pub enum NixFileType {
     /// A Nix flake (flake.nix)
     Flake,
-    /// A NixOS module
+    /// A `NixOS` module
     Module,
     /// An overlay
     Overlay,
     /// A derivation/package definition
     Derivation,
-    /// A NixOS configuration
+    /// A `NixOS` configuration
     Configuration,
     /// Unknown file type
     Unknown,
@@ -248,6 +248,12 @@ pub struct NixParser {
     config: ParserConfig,
 }
 
+impl Default for NixParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NixParser {
     /// Create a new parser with default configuration
     pub fn new() -> Self {
@@ -375,7 +381,7 @@ impl NixExpr {
         }
     }
     
-    /// Convert from our NixAst to NixExpr
+    /// Convert from our `NixAst` to `NixExpr`
     fn from_nix_ast(ast: NixAst) -> Self {
         match ast {
             NixAst::Integer(i) => NixExpr::Int(i),
@@ -444,7 +450,7 @@ impl NixExpr {
                     Box::new(Self::from_nix_ast(*body))
                 )
             }
-            _ => NixExpr::Other(format!("{:?}", ast)),
+            _ => NixExpr::Other(format!("{ast:?}")),
         }
     }
 }

@@ -181,14 +181,14 @@ impl OverlayAggregate {
     }
 }
 
-/// Represents a NixOS configuration aggregate
+/// Represents a `NixOS` configuration aggregate
 #[derive(Debug, Clone)]
 pub struct ConfigurationAggregate {
     /// Unique identifier for the configuration aggregate
     pub id: Uuid,
     /// Name of the configuration
     pub name: String,
-    /// The NixOS configuration entity
+    /// The `NixOS` configuration entity
     pub configuration: NixOSConfiguration,
     /// Whether this configuration is currently active
     pub is_active: bool,

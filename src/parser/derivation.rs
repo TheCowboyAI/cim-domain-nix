@@ -2,7 +2,6 @@
 
 use super::NixFile;
 use crate::Result;
-use std::path::PathBuf;
 
 /// A parsed Nix derivation
 #[derive(Debug, Clone)]

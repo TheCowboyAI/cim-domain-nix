@@ -208,7 +208,7 @@ impl PerformanceAnalyzer {
                 issues.push(PerformanceIssue {
                     issue_type: PerformanceIssueType::LargeListOperation,
                     impact: ImpactLevel::Medium,
-                    description: desc.to_string(),
+                    description: (*desc).to_string(),
                     file: file.as_ref().map(|p| p.display().to_string()),
                     line: None,
                     cost_estimate: Some("O(n²) complexity for large lists".to_string()),

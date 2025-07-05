@@ -7,7 +7,7 @@ pub mod analyzer;
 pub mod flake_lock_tracker;
 
 use crate::{
-    value_objects::*,
+    value_objects::{Flake, StorePath, FlakeRef, FlakeInputs, FlakeOutputs},
     Result, NixDomainError,
 };
 use std::path::{Path, PathBuf};
@@ -184,10 +184,10 @@ impl GitNixMapper {
         
         // Use nix to resolve the Git hash to a store path
         let output = tokio::process::Command::new("nix")
-            .args(&[
+            .args([
                 "eval",
                 "--expr",
-                &format!("builtins.fetchGit {{ rev = \"{}\"; }}", git_hash),
+                &format!("builtins.fetchGit {{ rev = \"{git_hash}\"; }}"),
                 "--raw"
             ])
             .output()
@@ -202,7 +202,7 @@ impl GitNixMapper {
         
         let store_path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
         StorePath::parse(&store_path_str)
-            .map_err(|e| NixDomainError::ParseError(e))
+            .map_err(NixDomainError::ParseError)
     }
 }
 
@@ -429,7 +429,7 @@ impl GitFlakeService {
     /// Get the current Git revision
     async fn get_current_revision(&self, repo_path: &Path) -> Result<CommitHash> {
         let output = tokio::process::Command::new("git")
-            .args(&["rev-parse", "HEAD"])
+            .args(["rev-parse", "HEAD"])
             .current_dir(repo_path)
             .output()
             .await
@@ -449,7 +449,7 @@ impl GitFlakeService {
     /// Get the default branch
     async fn get_default_branch(&self, repo_path: &Path) -> Result<BranchName> {
         let output = tokio::process::Command::new("git")
-            .args(&["symbolic-ref", "refs/remotes/origin/HEAD"])
+            .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
             .current_dir(repo_path)
             .output()
             .await
@@ -489,9 +489,8 @@ impl GitFlakeService {
         }
         
         let last_modified = locked.get("lastModified")
-            .and_then(|t| t.as_i64())
-            .map(|ts| DateTime::from_timestamp(ts, 0))
-            .flatten();
+            .and_then(serde_json::Value::as_i64)
+            .and_then(|ts| DateTime::from_timestamp(ts, 0));
         
         match input_type {
             "github" => {
@@ -500,9 +499,7 @@ impl GitFlakeService {
                 let rev = locked.get("rev").and_then(|r| r.as_str());
                 
                 // Use the mapper to convert to flake ref if possible
-                let url = self.mapper.git_url_to_flake_ref(&format!("https://github.com/{owner}/{repo}"))
-                    .map(|ref_| ref_.uri)
-                    .unwrap_or_else(|_| format!("github:{owner}/{repo}"));
+                let url = self.mapper.git_url_to_flake_ref(&format!("https://github.com/{owner}/{repo}")).map_or_else(|_| format!("github:{owner}/{repo}"), |ref_| ref_.uri);
                 
                 Ok(GitFlakeInput {
                     name: name.to_string(),

@@ -353,10 +353,10 @@ pub fn extract_string_value(node: &SyntaxNode) -> Option<String> {
             // Sometimes the string is a child of the current node
             node.children()
                 .find(|child| child.kind() == SyntaxKind::NODE_STRING)
-                .and_then(|string_node| {
+                .map(|string_node| {
                     let text = string_node.text().to_string();
                     let trimmed = text.trim_start_matches('"').trim_end_matches('"');
-                    Some(trimmed.to_string())
+                    trimmed.to_string()
                 })
         }
     }
@@ -474,7 +474,7 @@ pub fn create_lambda(params: &[&str], body: &str) -> String {
     format!("{param_str}: {body}")
 }
 
-/// Convert from rnix SyntaxNode to our AST representation
+/// Convert from rnix `SyntaxNode` to our AST representation
 pub fn from_syntax_node(node: &SyntaxNode) -> Result<NixAst, AstError> {
     match node.kind() {
         SyntaxKind::NODE_LITERAL => parse_literal(node),
@@ -648,7 +648,7 @@ fn parse_string(node: &SyntaxNode) -> Result<NixAst, AstError> {
         if let Some(token) = token.as_token() {
             match token.kind() {
                 SyntaxKind::TOKEN_STRING_CONTENT => {
-                    content.push_str(&token.text());
+                    content.push_str(token.text());
                 }
                 _ => {} // Ignore string delimiters and other tokens
             }
@@ -953,41 +953,40 @@ fn parse_let(node: &SyntaxNode) -> Result<NixAst, AstError> {
     // Parse children to find bindings and body
     for child in node.children() {
         // Check if we've hit the 'in' keyword area
-        if !found_in {
-            match child.kind() {
-                SyntaxKind::NODE_ATTRPATH_VALUE => {
-                    if let Ok(binding) = parse_binding(&child) {
-                        bindings.push(binding);
-                    }
-                }
-                SyntaxKind::NODE_INHERIT => {
-                    if let Ok(inherit_bindings) = parse_inherit(&child) {
-                        bindings.extend(inherit_bindings);
-                    }
-                }
-                _ => {
-                    // This might be the body after 'in'
-                    // Check tokens to see if we've passed 'in'
-                    for token in node.children_with_tokens() {
-                        if let Some(token) = token.as_token() {
-                            if token.text() == "in" {
-                                found_in = true;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // If we found 'in', this child might be the body
-                    if found_in {
-                        body = Some(child);
-                        break;
-                    }
-                }
-            }
-        } else {
+        if found_in {
             // Everything after 'in' is the body
             body = Some(child);
             break;
+        }
+        match child.kind() {
+            SyntaxKind::NODE_ATTRPATH_VALUE => {
+                if let Ok(binding) = parse_binding(&child) {
+                    bindings.push(binding);
+                }
+            }
+            SyntaxKind::NODE_INHERIT => {
+                if let Ok(inherit_bindings) = parse_inherit(&child) {
+                    bindings.extend(inherit_bindings);
+                }
+            }
+            _ => {
+                // This might be the body after 'in'
+                // Check tokens to see if we've passed 'in'
+                for token in node.children_with_tokens() {
+                    if let Some(token) = token.as_token() {
+                        if token.text() == "in" {
+                            found_in = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // If we found 'in', this child might be the body
+                if found_in {
+                    body = Some(child);
+                    break;
+                }
+            }
         }
     }
     

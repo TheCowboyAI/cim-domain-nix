@@ -20,6 +20,12 @@ pub struct HomeManagerAnalyzer {
     config_cache: HashMap<String, HomeConfiguration>,
 }
 
+impl Default for HomeManagerAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HomeManagerAnalyzer {
     /// Create a new Home Manager analyzer
     pub fn new() -> Self {
@@ -219,8 +225,7 @@ impl HomeManagerAnalyzer {
         let enabled_shells: Vec<_> = shells.iter()
             .filter(|&&shell| {
                 config.programs.get(shell)
-                    .map(|p| p.enabled)
-                    .unwrap_or(false)
+                    .is_some_and(|p| p.enabled)
             })
             .collect();
         
@@ -228,7 +233,7 @@ impl HomeManagerAnalyzer {
             conflicts.push(ConflictInfo {
                 conflict_type: ConflictType::ConflictingSettings,
                 description: "Multiple shells are enabled".to_string(),
-                affected_items: enabled_shells.iter().map(|s| s.to_string()).collect(),
+                affected_items: enabled_shells.iter().map(|s| (**s).to_string()).collect(),
             });
         }
         

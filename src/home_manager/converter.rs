@@ -22,6 +22,12 @@ pub trait DotfileConverter: Send + Sync {
 /// Git configuration converter
 pub struct GitConverter;
 
+impl Default for GitConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GitConverter {
     /// Create a new Git converter
     pub fn new() -> Self {
@@ -68,10 +74,10 @@ impl DotfileConverter for GitConverter {
         if !user_settings.is_empty() {
             config.settings.insert("userName".to_string(), 
                 user_settings.get("name").cloned()
-                    .unwrap_or_else(|| NixValue::String("".to_string())));
+                    .unwrap_or_else(|| NixValue::String(String::new())));
             config.settings.insert("userEmail".to_string(), 
                 user_settings.get("email").cloned()
-                    .unwrap_or_else(|| NixValue::String("".to_string())));
+                    .unwrap_or_else(|| NixValue::String(String::new())));
         }
         
         if !core_settings.is_empty() {
@@ -83,7 +89,7 @@ impl DotfileConverter for GitConverter {
         Ok(config)
     }
     
-    fn program_name(&self) -> &str {
+    fn program_name(&self) -> &'static str {
         "git"
     }
     
@@ -98,6 +104,12 @@ impl DotfileConverter for GitConverter {
 
 /// Vim configuration converter
 pub struct VimConverter;
+
+impl Default for VimConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl VimConverter {
     /// Create a new Vim converter
@@ -137,7 +149,7 @@ impl DotfileConverter for VimConverter {
         Ok(config)
     }
     
-    fn program_name(&self) -> &str {
+    fn program_name(&self) -> &'static str {
         "vim"
     }
     
@@ -152,6 +164,12 @@ impl DotfileConverter for VimConverter {
 
 /// Zsh configuration converter
 pub struct ZshConverter;
+
+impl Default for ZshConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl ZshConverter {
     /// Create a new Zsh converter
@@ -215,7 +233,7 @@ impl DotfileConverter for ZshConverter {
         Ok(config)
     }
     
-    fn program_name(&self) -> &str {
+    fn program_name(&self) -> &'static str {
         "zsh"
     }
     
@@ -230,6 +248,12 @@ impl DotfileConverter for ZshConverter {
 
 /// Tmux configuration converter
 pub struct TmuxConverter;
+
+impl Default for TmuxConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl TmuxConverter {
     /// Create a new Tmux converter
@@ -272,7 +296,7 @@ impl DotfileConverter for TmuxConverter {
         Ok(config)
     }
     
-    fn program_name(&self) -> &str {
+    fn program_name(&self) -> &'static str {
         "tmux"
     }
     

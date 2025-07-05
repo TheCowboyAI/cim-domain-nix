@@ -3,7 +3,7 @@
 use std::any::Any;
 use std::path::PathBuf;
 use uuid::Uuid;
-use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration, FlakeRef, NixExpression};
+use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration};
 use crate::events::ActivationType;
 use crate::aggregate::FlakeAggregate;
 

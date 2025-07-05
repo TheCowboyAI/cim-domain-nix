@@ -5,10 +5,10 @@ use crate::Result;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// A parser for NixOS modules
+/// A parser for `NixOS` modules
 pub struct ModuleParser;
 
-/// A parsed NixOS module
+/// A parsed `NixOS` module
 #[derive(Debug, Clone)]
 pub struct ParsedModule {
     /// The underlying parsed file
@@ -46,7 +46,7 @@ pub struct ModuleMeta {
 }
 
 impl ModuleParser {
-    /// Parse a NixFile as a module
+    /// Parse a `NixFile` as a module
     pub fn parse(file: &NixFile) -> Result<ParsedModule> {
         // TODO: Implement module parsing
         Ok(ParsedModule {

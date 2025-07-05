@@ -15,6 +15,12 @@ pub struct AdvancedParser {
     current_file: Option<PathBuf>,
 }
 
+impl Default for AdvancedParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AdvancedParser {
     /// Create a new advanced parser
     pub fn new() -> Self {
@@ -39,7 +45,7 @@ impl AdvancedParser {
         if !parsed.errors().is_empty() {
             let errors: Vec<String> = parsed.errors()
                 .iter()
-                .map(|e| e.to_string())
+                .map(std::string::ToString::to_string)
                 .collect();
             return Err(NixDomainError::ParseError(errors.join("; ")));
         }

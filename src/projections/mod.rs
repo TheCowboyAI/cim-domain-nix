@@ -123,7 +123,7 @@ pub struct PackageBuildProjection {
 impl PackageBuildProjection {
     /// Handle a package built event
     pub fn handle_package_built(&mut self, event: &PackageBuilt) {
-        let key = format!("x86_64-linux#{}", event.attribute.to_string());
+        let key = format!("x86_64-linux#{}", event.attribute);
         
         let package_info = PackageInfo {
             name: event.attribute.to_string(),

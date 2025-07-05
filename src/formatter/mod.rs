@@ -134,10 +134,10 @@ impl FormatterService {
         Ok(FormattingResult {
             formatted: output.status.success() && !self.check_only,
             needs_formatting: !output.status.success() && self.check_only,
-            error: if !output.status.success() {
-                Some(String::from_utf8_lossy(&output.stderr).to_string())
-            } else {
+            error: if output.status.success() {
                 None
+            } else {
+                Some(String::from_utf8_lossy(&output.stderr).to_string())
             },
         })
     }

@@ -1,19 +1,17 @@
 //! Flake-specific parsing and manipulation
 
 use super::NixFile;
-use crate::parser::ast::*;
-use crate::value_objects::{FlakeRef, FlakeInputs, FlakeOutputs, Flake};
+use crate::parser::ast::{get_attribute_value, extract_string_value};
+use crate::value_objects::{FlakeRef, FlakeInputs, FlakeOutputs};
 use crate::{Result, NixDomainError};
 use rnix::{SyntaxNode, SyntaxKind};
 use std::collections::HashMap;
-use std::path::PathBuf;
-use uuid::Uuid;
 
 /// A parser for Nix flakes
 pub struct FlakeParser;
 
 impl FlakeParser {
-    /// Parse a NixFile as a flake
+    /// Parse a `NixFile` as a flake
     pub fn parse(file: &NixFile) -> Result<ParsedFlake> {
         if !file.errors.is_empty() {
             return Err(NixDomainError::ParseError(
@@ -203,7 +201,7 @@ impl ParsedFlake {
         
         // Add description
         if let Some(desc) = &self.description {
-            content.push_str(&format!("  description = \"{}\";\n\n", desc));
+            content.push_str(&format!("  description = \"{desc}\";\n\n"));
         }
         
         // Add inputs

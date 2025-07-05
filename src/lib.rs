@@ -1,7 +1,7 @@
 //! Domain-Driven Design module for Nix ecosystem operations
 //! 
 //! This module provides comprehensive support for working with the Nix package manager
-//! and NixOS configuration management within the CIM architecture.
+//! and `NixOS` configuration management within the CIM architecture.
 //!
 //! # Examples
 //!

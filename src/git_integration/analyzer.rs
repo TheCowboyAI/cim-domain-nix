@@ -99,7 +99,7 @@ impl GitNixAnalyzer {
         // Get Git log for flake.lock
         let mut cmd = tokio::process::Command::new("git");
         cmd.current_dir(repo_path)
-            .args(&[
+            .args([
                 "log",
                 "--format=%H|%at|%an|%ae|%s",
                 "--follow",
@@ -232,16 +232,15 @@ impl GitNixAnalyzer {
                 if entry.timestamp.elapsed() < self.config.cache_ttl {
                     self.stats.lock().unwrap().cache_hits += 1;
                     return Ok(entry.data.clone());
-                } else {
-                    cache.remove(&cache_key);
                 }
+                cache.remove(&cache_key);
             }
             self.stats.lock().unwrap().cache_misses += 1;
         }
 
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
-            .args(&[
+            .args([
                 "show",
                 &format!("{}:{}", commit.as_str(), file_path),
             ])
@@ -292,9 +291,8 @@ impl GitNixAnalyzer {
                 if entry.timestamp.elapsed() < self.config.cache_ttl {
                     self.stats.lock().unwrap().cache_hits += 1;
                     return Ok(entry.data.clone());
-                } else {
-                    cache.remove(&cache_key);
                 }
+                cache.remove(&cache_key);
             }
         }
         
@@ -348,7 +346,7 @@ impl GitNixAnalyzer {
             .ok_or_else(|| NixDomainError::ParseError("Missing input type".to_string()))?;
 
         let last_modified = locked.get("lastModified")
-            .and_then(|t| t.as_i64())
+            .and_then(serde_json::Value::as_i64)
             .and_then(|ts| DateTime::from_timestamp(ts, 0));
 
         match input_type {
@@ -366,7 +364,7 @@ impl GitNixAnalyzer {
                         // In real usage, this would be a full hash
                         if r.len() < 40 {
                             // Pad with zeros for testing
-                            CommitHash::new(&format!("{:0<40}", r)).ok()
+                            CommitHash::new(format!("{r:0<40}")).ok()
                         } else {
                             CommitHash::new(r).ok()
                         }
@@ -389,7 +387,7 @@ impl GitNixAnalyzer {
                         // In real usage, this would be a full hash
                         if r.len() < 40 {
                             // Pad with zeros for testing
-                            CommitHash::new(&format!("{:0<40}", r)).ok()
+                            CommitHash::new(format!("{r:0<40}")).ok()
                         } else {
                             CommitHash::new(r).ok()
                         }
@@ -436,7 +434,7 @@ impl GitNixAnalyzer {
         // Build git log command
         let mut cmd = tokio::process::Command::new("git");
         cmd.current_dir(repo_path)
-            .args(&[
+            .args([
                 "log",
                 "--format=%H|%at|%an|%ae|%s",
                 "--name-status",
