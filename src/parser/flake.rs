@@ -52,29 +52,26 @@ impl FlakeParser {
         
         if let Some(inputs_node) = get_attribute_value(attrset, "inputs") {
             if inputs_node.kind() == SyntaxKind::NODE_ATTR_SET {
-                // Extract each input
+                // Extract each input using proper AST traversal
                 for child in inputs_node.children() {
-                    // Simple text-based extraction for now
-                    let text = child.text().to_string();
-                    if text.contains('=') && text.contains('.') {
-                        // Handle "nixpkgs.url = ..." format
-                        let parts: Vec<&str> = text.split('.').collect();
-                        if parts.len() >= 2 {
-                            let input_name = parts[0].trim().to_string();
-                            // Find the URL value after the equals sign
-                            if let Some(eq_pos) = text.find('=') {
-                                let url_part = &text[eq_pos + 1..];
-                                let url = url_part.trim().trim_end_matches(';').trim_matches('"');
-                                inputs.insert(input_name, FlakeRef::new(url));
+                    // In rnix 0.11, key-value pairs might be ENTRY nodes
+                    if child.text().to_string().contains('=') {
+                        // Find the key (input name)
+                        let key_node = child.children()
+                            .find(|n| n.kind() == SyntaxKind::NODE_IDENT);
+                        
+                        // Find the value node
+                        let value_node = child.children()
+                            .find(|n| n.kind() == SyntaxKind::NODE_STRING 
+                                   || n.kind() == SyntaxKind::NODE_ATTR_SET);
+                        
+                        if let (Some(key), Some(value)) = (key_node, value_node) {
+                            let input_name = key.text().to_string();
+                            
+                            // Use extract_input_url to properly handle both string and attrset formats
+                            if let Some(url) = Self::extract_input_url(&value) {
+                                inputs.insert(input_name, FlakeRef::new(&url));
                             }
-                        }
-                    } else if text.contains('=') {
-                        // Handle direct assignment format
-                        let parts: Vec<&str> = text.split('=').collect();
-                        if parts.len() == 2 {
-                            let input_name = parts[0].trim().to_string();
-                            let url = parts[1].trim().trim_end_matches(';').trim_matches('"');
-                            inputs.insert(input_name, FlakeRef::new(url));
                         }
                     }
                 }

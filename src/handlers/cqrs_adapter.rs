@@ -48,13 +48,32 @@ impl CreateFlakeHandler {
 
 impl CommandHandler<CreateFlake> for CreateFlakeHandler {
     fn handle(&mut self, envelope: CommandEnvelope<CreateFlake>) -> CommandAcknowledgment {
-        // For now, just acknowledge the command
-        // In a real implementation, this would execute the command through the Nix handler
-        CommandAcknowledgment {
-            command_id: envelope.id,
-            correlation_id: envelope.identity.correlation_id,
-            status: CommandStatus::Accepted,
-            reason: None,
+        // Execute the command through the Nix handler
+        let command = envelope.command;
+        
+        // Use the nix_handler to actually create the flake
+        // For now, we'll use default values for packages and dev_shells
+        let packages: Vec<String> = vec![];
+        let dev_shells: Vec<String> = vec!["default".to_string()];
+        
+        match futures::executor::block_on(self.nix_handler.handle_create_flake(
+            &command.path.to_string_lossy(),
+            &command.description,
+            &packages,
+            &dev_shells,
+        )) {
+            Ok(_) => CommandAcknowledgment {
+                command_id: envelope.id,
+                correlation_id: envelope.identity.correlation_id,
+                status: CommandStatus::Accepted,
+                reason: None,
+            },
+            Err(e) => CommandAcknowledgment {
+                command_id: envelope.id,
+                correlation_id: envelope.identity.correlation_id,
+                status: CommandStatus::Rejected,
+                reason: Some(e.to_string()),
+            }
         }
     }
 }
@@ -75,12 +94,31 @@ impl UpdateFlakeHandler {
 
 impl CommandHandler<UpdateFlake> for UpdateFlakeHandler {
     fn handle(&mut self, envelope: CommandEnvelope<UpdateFlake>) -> CommandAcknowledgment {
-        // For now, just acknowledge the command
-        CommandAcknowledgment {
-            command_id: envelope.id,
-            correlation_id: envelope.identity.correlation_id,
-            status: CommandStatus::Accepted,
-            reason: None,
+        // Execute the command through the Nix handler
+        let command = envelope.command;
+        
+        // Use the nix_handler to actually update the flake
+        let packages: Vec<String> = vec![];
+        let dev_shells: Vec<String> = vec![];
+        
+        match futures::executor::block_on(self.nix_handler.handle_update_flake(
+            &command.path.to_string_lossy(),
+            None,  // No description update
+            &packages,
+            &dev_shells,
+        )) {
+            Ok(_) => CommandAcknowledgment {
+                command_id: envelope.id,
+                correlation_id: envelope.identity.correlation_id,
+                status: CommandStatus::Accepted,
+                reason: None,
+            },
+            Err(e) => CommandAcknowledgment {
+                command_id: envelope.id,
+                correlation_id: envelope.identity.correlation_id,
+                status: CommandStatus::Rejected,
+                reason: Some(e.to_string()),
+            },
         }
     }
 }
@@ -101,12 +139,30 @@ impl BuildPackageHandler {
 
 impl CommandHandler<BuildPackage> for BuildPackageHandler {
     fn handle(&mut self, envelope: CommandEnvelope<BuildPackage>) -> CommandAcknowledgment {
-        // For now, just acknowledge the command
-        CommandAcknowledgment {
-            command_id: envelope.id,
-            correlation_id: envelope.identity.correlation_id,
-            status: CommandStatus::Accepted,
-            reason: None,
+        // Execute the command through the Nix handler
+        let command = envelope.command;
+        
+        // Use the nix_handler to actually build the package
+        let attribute_str = command.attribute.segments.join(".");
+        let output_path = command.output_path.as_ref().map(|p| p.to_string_lossy().to_string());
+        
+        match futures::executor::block_on(self.nix_handler.handle_build_package(
+            &command.flake_ref,
+            &attribute_str,
+            output_path.as_deref(),
+        )) {
+            Ok(_) => CommandAcknowledgment {
+                command_id: envelope.id,
+                correlation_id: envelope.identity.correlation_id,
+                status: CommandStatus::Accepted,
+                reason: None,
+            },
+            Err(e) => CommandAcknowledgment {
+                command_id: envelope.id,
+                correlation_id: envelope.identity.correlation_id,
+                status: CommandStatus::Rejected,
+                reason: Some(e.to_string()),
+            },
         }
     }
 } 

@@ -562,26 +562,7 @@ fn parse_root(node: &SyntaxNode) -> Result<NixAst, AstError> {
         .and_then(|child| from_syntax_node(&child))
 }
 
-fn parse_import(node: &SyntaxNode) -> Result<NixAst, AstError> {
-    // Import expressions have the form: import <expr>
-    // Find the expression after the import keyword
-    let mut found_import = false;
-    for child in node.children() {
-        if found_import {
-            return Ok(NixAst::Import(Box::new(from_syntax_node(&child)?)));
-        }
-        if child.text().to_string().trim() == "import" {
-            found_import = true;
-        }
-    }
-    
-    // If we have children, try to parse the first one as the import expression
-    if let Some(child) = node.children().next() {
-        return Ok(NixAst::Import(Box::new(from_syntax_node(&child)?)));
-    }
-    
-    Err(AstError::InvalidStructure("Import missing expression".to_string()))
-}
+// parse_import functionality is now handled inline in from_syntax_node for NODE_APPLY
 
 /// Errors that can occur during AST parsing
 #[derive(Debug, Clone, thiserror::Error)]

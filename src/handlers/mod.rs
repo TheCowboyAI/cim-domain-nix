@@ -402,6 +402,53 @@ impl NixCommandHandler {
         }
     }
 
+    /// Handle create flake command
+    pub async fn handle_create_flake(
+        &self,
+        name: &str,
+        description: &str,
+        packages: &[String],
+        dev_shells: &[String],
+    ) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+        let cmd = CreateFlake {
+            path: PathBuf::from(name),
+            description: description.to_string(),
+            template: None,
+        };
+        self.flake_handler.create_flake(cmd).await
+    }
+
+    /// Handle update flake command
+    pub async fn handle_update_flake(
+        &self,
+        path: &str,
+        description: Option<&str>,
+        packages: &[String],
+        dev_shells: &[String],
+    ) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+        let cmd = UpdateFlake {
+            path: PathBuf::from(path),
+        };
+        self.flake_handler.update_flake(cmd).await
+    }
+
+    /// Handle build package command
+    pub async fn handle_build_package(
+        &self,
+        flake_ref: &str,
+        attribute: &str,
+        output_path: Option<&str>,
+    ) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+        let cmd = BuildPackage {
+            flake_ref: flake_ref.to_string(),
+            attribute: crate::value_objects::AttributePath {
+                segments: attribute.split('.').map(String::from).collect(),
+            },
+            output_path: output_path.map(PathBuf::from),
+        };
+        self.package_handler.build_package(cmd).await
+    }
+
     /// Handle any Nix command by delegating to the appropriate handler
     pub async fn handle_command(&self, cmd: Box<dyn NixCommand>) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         // Downcast to specific command types

@@ -37,8 +37,26 @@ impl HomeManagerAnalyzer {
 
     /// Analyze a Home Manager configuration file
     pub async fn analyze_home_config(&mut self, path: &Path) -> Result<HomeAnalysis, NixDomainError> {
+        // Check cache first
+        let cache_key = path.to_string_lossy().to_string();
+        
+        // If configuration is in cache and file hasn't been modified, use cached config
+        if let Some(cached_config) = self.config_cache.get(&cache_key) {
+            if let Ok(metadata) = fs::metadata(path) {
+                if let Ok(modified) = metadata.modified() {
+                    // For now, always re-parse to ensure freshness
+                    // In production, would check modification time
+                    tracing::debug!("Found cached config for {}, but re-parsing for freshness", cache_key);
+                }
+            }
+        }
+        
         let parsed = self.parser.parse_file(path)?;
         let config = self.extract_home_config(&parsed)?;
+        
+        // Store in cache for future use
+        self.config_cache.insert(cache_key.clone(), config.clone());
+        tracing::debug!("Cached configuration for {}", cache_key);
         
         let analysis = HomeAnalysis {
             programs: self.analyze_programs(&config)?,
@@ -449,6 +467,25 @@ impl HomeManagerAnalyzer {
             ".zshrc" | ".zshenv" => Some("zsh".to_string()),
             ".tmux.conf" => Some("tmux".to_string()),
             _ => None,
+        }
+    }
+    
+    /// Clear the configuration cache
+    pub fn clear_cache(&mut self) {
+        self.config_cache.clear();
+        tracing::debug!("Cleared configuration cache");
+    }
+    
+    /// Get the size of the configuration cache
+    pub fn cache_size(&self) -> usize {
+        self.config_cache.len()
+    }
+    
+    /// Remove a specific configuration from cache
+    pub fn invalidate_cache(&mut self, path: &Path) {
+        let cache_key = path.to_string_lossy().to_string();
+        if self.config_cache.remove(&cache_key).is_some() {
+            tracing::debug!("Invalidated cache for {}", cache_key);
         }
     }
 } 
