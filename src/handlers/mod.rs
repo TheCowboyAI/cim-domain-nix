@@ -407,8 +407,8 @@ impl NixCommandHandler {
         &self,
         name: &str,
         description: &str,
-        packages: &[String],
-        dev_shells: &[String],
+        _packages: &[String],
+        _dev_shells: &[String],
     ) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let cmd = CreateFlake {
             path: PathBuf::from(name),
@@ -422,9 +422,9 @@ impl NixCommandHandler {
     pub async fn handle_update_flake(
         &self,
         path: &str,
-        description: Option<&str>,
-        packages: &[String],
-        dev_shells: &[String],
+        _description: Option<&str>,
+        _packages: &[String],
+        _dev_shells: &[String],
     ) -> Result<Vec<Box<dyn NixDomainEvent>>> {
         let cmd = UpdateFlake {
             path: PathBuf::from(path),
