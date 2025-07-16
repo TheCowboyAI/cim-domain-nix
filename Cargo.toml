@@ -23,7 +23,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Domain dependencies
 cim-domain = { path = "../cim-domain" }
-cim-subject = { path = "../cim-subject" }
+cim-subject = { path = "../cim-domain/crates/cim-subject" }
 cim-domain-git = { path = "../cim-domain-git" }
 
 # Nix-specific dependencies

@@ -456,4 +456,6 @@ impl NixExpr {
 }
 
 #[cfg(test)]
-mod tests; 
+mod tests;
+#[cfg(test)]
+mod module_tests; 
