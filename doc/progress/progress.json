@@ -1,0 +1,173 @@
+{
+  "metadata": {
+    "domain": "cim-domain-nix",
+    "description": "Nix Domain module for the CIM ecosystem",
+    "version": "0.3.0",
+    "last_updated": "2025-08-01",
+    "git_hash": "ff15278904f2febd1a69dd0875188b230b9544e7"
+  },
+  "overall_progress": 85,
+  "graph": {
+    "nodes": {
+      "aggregates": {
+        "id": "aggregates",
+        "type": "component",
+        "status": "COMPLETE",
+        "progress": 100,
+        "description": "Domain aggregates for Flake, Module, Overlay, Configuration",
+        "test_count": 8,
+        "dependencies": ["value_objects", "events"]
+      },
+      "value_objects": {
+        "id": "value_objects",
+        "type": "component",
+        "status": "COMPLETE",
+        "progress": 100,
+        "description": "Value objects: FlakeRef, AttributePath, StorePath, Derivation",
+        "test_count": 12
+      },
+      "events": {
+        "id": "events",
+        "type": "component",
+        "status": "COMPLETE",
+        "progress": 100,
+        "description": "Domain events with correlation/causation IDs",
+        "test_count": 20,
+        "completed": "All events now have proper correlation/causation IDs per CIM standards"
+      },
+      "handlers": {
+        "id": "handlers",
+        "type": "component",
+        "status": "IMPLEMENTED",
+        "progress": 85,
+        "description": "CQRS command and query handlers",
+        "test_count": 20,
+        "dependencies": ["aggregates", "events", "services"]
+      },
+      "services": {
+        "id": "services",
+        "type": "component",
+        "status": "IMPLEMENTED",
+        "progress": 80,
+        "description": "High-level services for flake, build, and configuration management",
+        "test_count": 10,
+        "dependencies": ["aggregates", "parser"]
+      },
+      "parser": {
+        "id": "parser",
+        "type": "feature",
+        "status": "COMPLETE",
+        "progress": 100,
+        "description": "AST parsing and manipulation using rnix",
+        "test_count": 25
+      },
+      "analyzer": {
+        "id": "analyzer",
+        "type": "feature",
+        "status": "IMPLEMENTED",
+        "progress": 85,
+        "description": "Security, performance, and dead code analysis",
+        "test_count": 18,
+        "dependencies": ["parser"]
+      },
+      "formatter": {
+        "id": "formatter",
+        "type": "feature",
+        "status": "COMPLETE",
+        "progress": 100,
+        "description": "Integration with nixpkgs-fmt, alejandra, nixfmt",
+        "test_count": 8
+      },
+      "git_integration": {
+        "id": "git_integration",
+        "type": "feature",
+        "status": "IMPLEMENTED",
+        "progress": 80,
+        "description": "Track flake.lock changes and dependency updates",
+        "test_count": 6,
+        "dependencies": ["cim-domain-git"]
+      },
+      "home_manager": {
+        "id": "home_manager",
+        "type": "feature",
+        "status": "PLANNED",
+        "progress": 20,
+        "description": "Home Manager configuration support",
+        "test_count": 0
+      },
+      "mermaid_diagrams": {
+        "id": "mermaid_diagrams",
+        "type": "documentation",
+        "status": "COMPLETE",
+        "progress": 100,
+        "description": "Mandatory Mermaid diagrams for graph visualization",
+        "completed": "Added comprehensive domain architecture diagrams"
+      },
+      "correlation_causation": {
+        "id": "correlation_causation",
+        "type": "feature",
+        "status": "COMPLETE",
+        "progress": 100,
+        "description": "CIM-compliant correlation/causation ID implementation",
+        "test_count": 5,
+        "dependencies": ["value_objects", "events", "commands"]
+      }
+    },
+    "edges": [
+      {"from": "value_objects", "to": "events"},
+      {"from": "value_objects", "to": "aggregates"},
+      {"from": "events", "to": "aggregates"},
+      {"from": "aggregates", "to": "handlers"},
+      {"from": "aggregates", "to": "services"},
+      {"from": "parser", "to": "services"},
+      {"from": "parser", "to": "analyzer"},
+      {"from": "services", "to": "handlers"},
+      {"from": "cim-domain-git", "to": "git_integration"},
+      {"from": "value_objects", "to": "correlation_causation"},
+      {"from": "correlation_causation", "to": "events"},
+      {"from": "correlation_causation", "to": "commands"}
+    ]
+  },
+  "recent_changes": [
+    {
+      "date": "2025-08-01",
+      "version": "0.3.0",
+      "changes": [
+        "Updated to use git dependency for cim-domain instead of path",
+        "File naming consistency improvements",
+        "Module exports updated in handlers",
+        "Implemented correlation/causation IDs for all events and commands",
+        "Added MessageIdentity value object and MessageFactory",
+        "Created NixEventFactory for proper event creation",
+        "Added comprehensive tests for correlation/causation",
+        "Created Mermaid architecture diagrams"
+      ]
+    }
+  ],
+  "next_priorities": [
+    {
+      "priority": 1,
+      "task": "Implement Home Manager configuration support",
+      "reason": "Key feature for NixOS user management"
+    },
+    {
+      "priority": 2,
+      "task": "Add NATS integration for event publishing",
+      "reason": "Required for CIM distributed architecture"
+    },
+    {
+      "priority": 3,
+      "task": "Implement Persistable trait for business-critical events",
+      "reason": "Optional but recommended for important events"
+    }
+  ],
+  "metrics": {
+    "total_test_count": 130,
+    "test_coverage": "~80%",
+    "production_ready": false,
+    "blocking_issues": [
+      "Home Manager support incomplete",
+      "NATS integration not yet implemented"
+    ]
+  }
+}

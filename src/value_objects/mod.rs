@@ -2,6 +2,9 @@
 //!
 //! This module contains immutable value objects that represent
 //! core concepts in the Nix ecosystem.
+
+mod message_identity;
+pub use message_identity::{MessageId, CorrelationId, CausationId, MessageIdentity, MessageFactory};
 //!
 //! # Examples
 //!

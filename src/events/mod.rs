@@ -3,7 +3,10 @@
 //! This module contains events that represent state changes
 //! in the Nix ecosystem.
 
-use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration, StorePath};
+mod factory;
+pub use factory::NixEventFactory;
+
+use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration, StorePath, MessageIdentity, CorrelationId, CausationId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -21,6 +24,12 @@ pub trait NixDomainEvent: Send + Sync + std::fmt::Debug {
     /// Gets the aggregate ID this event belongs to
     fn aggregate_id(&self) -> Uuid;
     
+    /// Gets the correlation ID for this event
+    fn correlation_id(&self) -> CorrelationId;
+    
+    /// Gets the causation ID for this event
+    fn causation_id(&self) -> CausationId;
+    
     /// Get the event as Any for downcasting
     fn as_any(&self) -> &dyn Any;
 }
@@ -32,6 +41,8 @@ pub struct FlakeCreated {
     pub flake_id: Uuid,
     /// When the event occurred
     pub timestamp: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The flake that was created
     pub path: PathBuf,
     /// The flake description
@@ -53,6 +64,14 @@ impl NixDomainEvent for FlakeCreated {
         self.flake_id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -65,6 +84,8 @@ pub struct FlakeUpdated {
     pub flake_id: Uuid,
     /// When the event occurred
     pub timestamp: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The flake path
     pub path: PathBuf,
 }
@@ -82,6 +103,14 @@ impl NixDomainEvent for FlakeUpdated {
         self.flake_id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -94,6 +123,8 @@ pub struct FlakeInputAdded {
     pub flake_id: Uuid,
     /// When the event occurred
     pub timestamp: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The flake path
     pub path: PathBuf,
     /// Input name
@@ -115,6 +146,14 @@ impl NixDomainEvent for FlakeInputAdded {
         self.flake_id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -127,6 +166,8 @@ pub struct PackageBuilt {
     pub package_id: Uuid,
     /// When the event occurred
     pub timestamp: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The flake reference
     pub flake_ref: String,
     /// The attribute path
@@ -150,6 +191,14 @@ impl NixDomainEvent for PackageBuilt {
         self.package_id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -162,6 +211,8 @@ pub struct ModuleCreated {
     pub event_id: Uuid,
     /// When the event occurred
     pub occurred_at: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The module that was created
     pub module: NixModule,
 }
@@ -179,6 +230,14 @@ impl NixDomainEvent for ModuleCreated {
         self.module.id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -191,6 +250,8 @@ pub struct OverlayCreated {
     pub event_id: Uuid,
     /// When the event occurred
     pub occurred_at: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The overlay that was created
     pub overlay: Overlay,
 }
@@ -208,6 +269,14 @@ impl NixDomainEvent for OverlayCreated {
         self.overlay.id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -220,6 +289,8 @@ pub struct ConfigurationCreated {
     pub event_id: Uuid,
     /// When the event occurred
     pub occurred_at: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The configuration that was created
     pub configuration: NixOSConfiguration,
 }
@@ -237,6 +308,14 @@ impl NixDomainEvent for ConfigurationCreated {
         self.configuration.id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -249,6 +328,8 @@ pub struct ConfigurationActivated {
     pub event_id: Uuid,
     /// When the event occurred
     pub occurred_at: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The configuration ID
     pub configuration_id: Uuid,
     /// The system generation number
@@ -281,6 +362,14 @@ impl NixDomainEvent for ConfigurationActivated {
         self.configuration_id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -293,6 +382,8 @@ pub struct ExpressionEvaluated {
     pub expression_id: Uuid,
     /// When the event occurred
     pub timestamp: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// The expression that was evaluated
     pub expression: String,
     /// The result of the evaluation (as JSON)
@@ -312,6 +403,14 @@ impl NixDomainEvent for ExpressionEvaluated {
         self.expression_id
     }
     
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
+    }
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -324,6 +423,8 @@ pub struct GarbageCollected {
     pub collection_id: Uuid,
     /// When the event occurred
     pub timestamp: DateTime<Utc>,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Bytes freed
     pub freed_bytes: u64,
     /// Paths that were removed
@@ -341,6 +442,14 @@ impl NixDomainEvent for GarbageCollected {
     
     fn aggregate_id(&self) -> Uuid {
         self.collection_id
+    }
+    
+    fn correlation_id(&self) -> CorrelationId {
+        self.identity.correlation_id
+    }
+    
+    fn causation_id(&self) -> CausationId {
+        self.identity.causation_id
     }
     
     fn as_any(&self) -> &dyn Any {

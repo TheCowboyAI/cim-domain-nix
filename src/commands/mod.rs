@@ -3,7 +3,7 @@
 use std::any::Any;
 use std::path::PathBuf;
 use uuid::Uuid;
-use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration};
+use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration, MessageIdentity};
 use crate::events::ActivationType;
 use crate::aggregate::FlakeAggregate;
 
@@ -12,6 +12,9 @@ pub trait NixCommand: Send + Sync {
     /// Get the command ID
     fn command_id(&self) -> Uuid;
     
+    /// Get the message identity for correlation/causation
+    fn identity(&self) -> &MessageIdentity;
+    
     /// Get the command as Any for downcasting
     fn as_any(&self) -> &dyn Any;
 }
@@ -19,6 +22,8 @@ pub trait NixCommand: Send + Sync {
 /// Command to create a new flake
 #[derive(Debug, Clone)]
 pub struct CreateFlake {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Path where the flake will be created
     pub path: PathBuf,
     /// Human-readable description for the flake
@@ -29,7 +34,11 @@ pub struct CreateFlake {
 
 impl NixCommand for CreateFlake {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -48,13 +57,19 @@ impl cim_domain::Command for CreateFlake {
 /// Command to update a flake
 #[derive(Debug, Clone)]
 pub struct UpdateFlake {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Path to the flake to update
     pub path: PathBuf,
 }
 
 impl NixCommand for UpdateFlake {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -73,6 +88,8 @@ impl cim_domain::Command for UpdateFlake {
 /// Command to add an input to a flake
 #[derive(Debug, Clone)]
 pub struct AddFlakeInput {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Path to the flake to modify
     pub path: PathBuf,
     /// Name of the input to add
@@ -83,7 +100,11 @@ pub struct AddFlakeInput {
 
 impl NixCommand for AddFlakeInput {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -102,6 +123,8 @@ impl cim_domain::Command for AddFlakeInput {
 /// Command to build a package
 #[derive(Debug, Clone)]
 pub struct BuildPackage {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Flake reference to build from
     pub flake_ref: String,
     /// Attribute path to the package
@@ -112,7 +135,11 @@ pub struct BuildPackage {
 
 impl NixCommand for BuildPackage {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -131,8 +158,8 @@ impl cim_domain::Command for BuildPackage {
 /// Command to create a module
 #[derive(Debug, Clone)]
 pub struct CreateModule {
-    /// Unique command identifier
-    pub command_id: Uuid,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Module name
     pub name: String,
     /// The module to create
@@ -141,7 +168,11 @@ pub struct CreateModule {
 
 impl NixCommand for CreateModule {
     fn command_id(&self) -> Uuid {
-        self.command_id
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -160,8 +191,8 @@ impl cim_domain::Command for CreateModule {
 /// Command to create an overlay
 #[derive(Debug, Clone)]
 pub struct CreateOverlay {
-    /// Unique command identifier
-    pub command_id: Uuid,
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Overlay name
     pub name: String,
     /// The overlay to create
@@ -170,7 +201,11 @@ pub struct CreateOverlay {
 
 impl NixCommand for CreateOverlay {
     fn command_id(&self) -> Uuid {
-        self.command_id
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -189,6 +224,8 @@ impl cim_domain::Command for CreateOverlay {
 /// Command to create a configuration
 #[derive(Debug, Clone)]
 pub struct CreateConfiguration {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Configuration name
     pub name: String,
     /// The configuration to create
@@ -197,7 +234,11 @@ pub struct CreateConfiguration {
 
 impl NixCommand for CreateConfiguration {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -216,6 +257,8 @@ impl cim_domain::Command for CreateConfiguration {
 /// Command to activate a configuration
 #[derive(Debug, Clone)]
 pub struct ActivateConfiguration {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Configuration name to activate
     pub name: String,
     /// Type of activation to perform
@@ -224,7 +267,11 @@ pub struct ActivateConfiguration {
 
 impl NixCommand for ActivateConfiguration {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -243,13 +290,19 @@ impl cim_domain::Command for ActivateConfiguration {
 /// Command to evaluate a Nix expression
 #[derive(Debug, Clone)]
 pub struct EvaluateExpression {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Nix expression to evaluate
     pub expression: String,
 }
 
 impl NixCommand for EvaluateExpression {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
+    }
+    
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
     }
     
     fn as_any(&self) -> &dyn Any {

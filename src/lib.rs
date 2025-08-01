@@ -67,9 +67,10 @@ pub mod analyzer;
 pub mod commands;
 pub mod events;
 pub mod formatter;
-pub mod git_integration;
+// pub mod git_integration; // Temporarily disabled - depends on cim-domain-git
 pub mod handlers;
 pub mod home_manager;
+pub mod nats;
 pub mod parser;
 pub mod projections;
 pub mod queries;
@@ -145,7 +146,7 @@ impl From<parser::ParseError> for NixDomainError {
 }
 
 #[cfg(test)]
-mod tests {
+mod lib_tests {
     use super::*;
 
     #[test]

@@ -10,7 +10,7 @@ use crate::{
     },
     events::{
         FlakeCreated, FlakeInputAdded, ModuleCreated, OverlayCreated,
-        ConfigurationCreated, ConfigurationActivated
+        ConfigurationCreated, ConfigurationActivated, NixEventFactory
     },
     value_objects::{Flake, NixModule, Overlay, NixOSConfiguration},
     Result, NixDomainError,
@@ -63,23 +63,23 @@ impl FlakeAggregate {
 
         if let Some(create_flake) = cmd.downcast_ref::<CreateFlake>() {
             // Handle create flake command
-            let event = FlakeCreated {
-                flake_id: self.id,
-                path: create_flake.path.clone(),
-                description: create_flake.description.clone(),
-                template: create_flake.template.clone(),
-                timestamp: Utc::now(),
-            };
+            let event = NixEventFactory::create_flake_created_caused_by(
+                self.id,
+                create_flake.path.clone(),
+                create_flake.description.clone(),
+                create_flake.template.clone(),
+                &create_flake.identity,
+            );
             events.push(Box::new(event) as Box<dyn std::any::Any>);
         } else if let Some(add_input) = cmd.downcast_ref::<AddFlakeInput>() {
             // Handle add input command
-            let event = FlakeInputAdded {
-                flake_id: self.id,
-                path: add_input.path.clone(),
-                input_name: add_input.name.clone(),
-                input_url: add_input.url.clone(),
-                timestamp: Utc::now(),
-            };
+            let event = NixEventFactory::create_flake_input_added(
+                self.id,
+                add_input.path.clone(),
+                add_input.name.clone(),
+                add_input.url.clone(),
+                &add_input.identity,
+            );
             events.push(Box::new(event) as Box<dyn std::any::Any>);
         } else {
             return Err(NixDomainError::Other("Unknown command".to_string()));
