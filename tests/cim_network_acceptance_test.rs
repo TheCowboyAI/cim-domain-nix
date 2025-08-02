@@ -41,6 +41,51 @@ mod tests {
             "10.0.0.100".to_string(),
         ).await?;
         
+        // Get the updated topology with all nodes
+        let updated_topology = service.query_handler.get_topology(topology.id).await?
+            .expect("Should have topology");
+        
+        // Create connections between nodes
+        // First, get the Starlink node ID (it's the first node)
+        let starlink_id = updated_topology.nodes.iter()
+            .find(|n| n.name == "starlink-router")
+            .expect("Should have Starlink node")
+            .id;
+        
+        // Connection: Starlink -> UDM Pro
+        let starlink_to_udm = CreateNetworkConnection {
+            identity: MessageIdentity::new_root(),
+            topology_id: topology.id,
+            from_node: starlink_id,
+            to_node: udm_id,
+            connection_type: ConnectionType::Ethernet,
+            properties: ConnectionProperties {
+                bandwidth: Some(1000),  // 1Gbps
+                latency: Some(30),      // Starlink latency
+                redundant: false,
+                vlan_tags: vec![],
+            },
+        };
+        
+        // Connection: UDM Pro -> Mac Studio
+        let udm_to_mac = CreateNetworkConnection {
+            identity: MessageIdentity::new_root(),
+            topology_id: topology.id,
+            from_node: udm_id,
+            to_node: mac_id,
+            connection_type: ConnectionType::Ethernet,
+            properties: ConnectionProperties {
+                bandwidth: Some(10000),  // 10Gbps
+                latency: Some(1),        // LAN latency
+                redundant: false,
+                vlan_tags: vec![],
+            },
+        };
+        
+        // Create the connections
+        service.create_connection(starlink_to_udm).await?;
+        service.create_connection(udm_to_mac).await?;
+        
         // Generate NixOS configs
         let configs = service.generate_nixos_configs(topology.id).await?;
         
@@ -99,6 +144,25 @@ mod tests {
             topology.id,
             "10.0.0.100".to_string(),
         ).await?;
+        
+        // Get updated topology to verify nodes were added
+        let updated_topology = service.query_handler.get_topology(topology.id).await?
+            .expect("Should have topology");
+        
+        // Verify we have all three nodes
+        assert_eq!(updated_topology.nodes.len(), 3);
+        
+        // Find the nodes by ID
+        let udm_node = updated_topology.nodes.iter()
+            .find(|n| n.id == udm_id)
+            .expect("Should find UDM node");
+        let mac_node = updated_topology.nodes.iter()
+            .find(|n| n.id == mac_id)
+            .expect("Should find Mac node");
+        
+        // Verify tiers
+        assert_eq!(udm_node.tier, NodeTier::Cluster);
+        assert_eq!(mac_node.tier, NodeTier::Leaf);
         
         // Verify tier hierarchy
         assert!(NodeTier::SuperCluster.can_serve(&NodeTier::Cluster));

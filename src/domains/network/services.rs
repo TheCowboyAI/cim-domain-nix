@@ -2,21 +2,32 @@
 
 //! High-level services for network domain operations
 
-use super::commands::*;
+use super::commands::{*, CreateNetworkConnection};
 use super::handlers::{NetworkCommandHandler, NetworkQueryHandler, NetworkTopologyView};
 use super::value_objects::*;
 use crate::{
-    services::ConfigurationService,
-    value_objects::{MessageIdentity, NixOSConfiguration},
+    value_objects::MessageIdentity,
     Result,
 };
 use std::collections::HashMap;
+use serde_json;
+
+/// Simple NixOS configuration for network nodes
+#[derive(Debug, Clone)]
+pub struct NixOSConfig {
+    pub hostname: String,
+    pub system: String,
+    pub packages: Vec<String>,
+    pub services: HashMap<String, serde_json::Value>,
+    pub networking: HashMap<String, String>,
+    pub users: Vec<String>,
+    pub extra_config: String,
+}
 
 /// Service for managing network topologies and generating NixOS configurations
 pub struct NetworkTopologyService {
-    command_handler: NetworkCommandHandler,
-    query_handler: NetworkQueryHandler,
-    config_service: ConfigurationService,
+    pub command_handler: NetworkCommandHandler,
+    pub query_handler: NetworkQueryHandler,
 }
 
 impl NetworkTopologyService {
@@ -25,7 +36,6 @@ impl NetworkTopologyService {
         Self {
             command_handler: NetworkCommandHandler::new(),
             query_handler: NetworkQueryHandler::new(),
-            config_service: ConfigurationService::new(),
         }
     }
     
@@ -36,6 +46,9 @@ impl NetworkTopologyService {
         wan_subnet: String,
         lan_subnet: String,
     ) -> Result<NetworkTopologyView> {
+        // Generate the topology ID first so we know what it will be
+        let topology_id = NetworkTopologyId::new();
+        
         // Create the topology
         let create_cmd = CreateNetworkTopology {
             identity: MessageIdentity::new_root(),
@@ -50,22 +63,35 @@ impl NetworkTopologyService {
             },
         };
         
-        let events = self.command_handler.handle_create_topology(create_cmd).await?;
-        let topology_id = if let Some(event) = events.first() {
-            if let Ok(e) = event.as_any().downcast_ref::<super::events::NetworkTopologyCreated>() {
-                e.topology_id
-            } else {
-                return Err(crate::NixDomainError::Other("Failed to get topology ID".to_string()));
-            }
-        } else {
+        let events = self.command_handler.handle_create_topology_with_id(topology_id, create_cmd).await?;
+        if events.is_empty() {
             return Err(crate::NixDomainError::Other("No events generated".to_string()));
-        };
+        }
+        
+        // Verify the event is a NetworkTopologyCreated
+        if let Some(event) = events.first() {
+            match event.event_type() {
+                "NetworkTopologyCreated" => {
+                    // We know the topology was created with the ID we provided
+                },
+                _ => return Err(crate::NixDomainError::Other("Unexpected event type".to_string())),
+            }
+        }
+        
+        // Sync handlers after creating topology
+        self.sync_handlers();
         
         // Add Starlink router
+        let starlink_name = "starlink-router";
+        let _starlink_id = NetworkNodeId(uuid::Uuid::new_v5(
+            &uuid::Uuid::NAMESPACE_DNS,
+            format!("{}-{}", topology_id.0, starlink_name).as_bytes()
+        ));
+        
         let add_starlink = AddNodeToTopology {
             identity: MessageIdentity::new_root(),
             topology_id,
-            name: "starlink-router".to_string(),
+            name: starlink_name.to_string(),
             node_type: NodeType::Gateway,
             tier: NodeTier::SuperCluster,
             interfaces: vec![
@@ -102,6 +128,9 @@ impl NetworkTopologyService {
         
         self.command_handler.handle_add_node(add_starlink).await?;
         
+        // Sync the command handler state to query handler
+        self.sync_handlers();
+        
         // Return the topology view
         self.query_handler.get_topology(topology_id).await?
             .ok_or_else(|| crate::NixDomainError::Other("Topology not found".to_string()))
@@ -114,10 +143,17 @@ impl NetworkTopologyService {
         wan_ip: String,
         lan_subnet: String,
     ) -> Result<NetworkNodeId> {
+        // Calculate the same node ID that the aggregate will generate
+        let node_name = "udm-pro";
+        let node_id = NetworkNodeId(uuid::Uuid::new_v5(
+            &uuid::Uuid::NAMESPACE_DNS,
+            format!("{}-{}", topology_id.0, node_name).as_bytes()
+        ));
+        
         let add_udm = AddNodeToTopology {
             identity: MessageIdentity::new_root(),
             topology_id,
-            name: "udm-pro".to_string(),
+            name: node_name.to_string(),
             node_type: NodeType::Router,
             tier: NodeTier::Cluster,
             interfaces: vec![
@@ -159,16 +195,22 @@ impl NetworkTopologyService {
         
         let events = self.command_handler.handle_add_node(add_udm).await?;
         
-        // Extract node ID from event
+        // Verify the event is NodeAddedToTopology
         if let Some(event) = events.first() {
-            if let Ok(e) = event.as_any().downcast_ref::<super::events::NodeAddedToTopology>() {
-                Ok(e.node_id)
-            } else {
-                Err(crate::NixDomainError::Other("Failed to get node ID".to_string()))
+            match event.event_type() {
+                "NodeAddedToTopology" => {
+                    // Node was successfully added
+                },
+                _ => return Err(crate::NixDomainError::Other("Unexpected event type".to_string())),
             }
         } else {
-            Err(crate::NixDomainError::Other("No events generated".to_string()))
+            return Err(crate::NixDomainError::Other("No events generated".to_string()));
         }
+        
+        // Sync handlers
+        self.sync_handlers();
+        
+        Ok(node_id)
     }
     
     /// Add Mac Studio as leaf node
@@ -177,10 +219,17 @@ impl NetworkTopologyService {
         topology_id: NetworkTopologyId,
         ip_address: String,
     ) -> Result<NetworkNodeId> {
+        // Calculate the same node ID that the aggregate will generate
+        let node_name = "mac-studio-leaf";
+        let node_id = NetworkNodeId(uuid::Uuid::new_v5(
+            &uuid::Uuid::NAMESPACE_DNS,
+            format!("{}-{}", topology_id.0, node_name).as_bytes()
+        ));
+        
         let add_mac = AddNodeToTopology {
             identity: MessageIdentity::new_root(),
             topology_id,
-            name: "mac-studio-leaf".to_string(),
+            name: node_name.to_string(),
             node_type: NodeType::Server,
             tier: NodeTier::Leaf,
             interfaces: vec![
@@ -212,23 +261,29 @@ impl NetworkTopologyService {
         
         let events = self.command_handler.handle_add_node(add_mac).await?;
         
-        // Extract node ID from event
+        // Verify the event is NodeAddedToTopology
         if let Some(event) = events.first() {
-            if let Ok(e) = event.as_any().downcast_ref::<super::events::NodeAddedToTopology>() {
-                Ok(e.node_id)
-            } else {
-                Err(crate::NixDomainError::Other("Failed to get node ID".to_string()))
+            match event.event_type() {
+                "NodeAddedToTopology" => {
+                    // Node was successfully added
+                },
+                _ => return Err(crate::NixDomainError::Other("Unexpected event type".to_string())),
             }
         } else {
-            Err(crate::NixDomainError::Other("No events generated".to_string()))
+            return Err(crate::NixDomainError::Other("No events generated".to_string()));
         }
+        
+        // Sync handlers
+        self.sync_handlers();
+        
+        Ok(node_id)
     }
     
     /// Generate NixOS configurations for all nodes in topology
     pub async fn generate_nixos_configs(
         &self,
         topology_id: NetworkTopologyId,
-    ) -> Result<Vec<NixOSConfiguration>> {
+    ) -> Result<Vec<NixOSConfig>> {
         let topology = self.query_handler.get_topology(topology_id).await?
             .ok_or_else(|| crate::NixDomainError::Other("Topology not found".to_string()))?;
         
@@ -243,11 +298,10 @@ impl NetworkTopologyService {
     }
     
     /// Generate NixOS configuration for a single node
-    async fn generate_node_config(&self, node: &super::handlers::NetworkNodeView) -> Result<NixOSConfiguration> {
-        let mut config = NixOSConfiguration {
+    async fn generate_node_config(&self, node: &super::handlers::NetworkNodeView) -> Result<NixOSConfig> {
+        let mut config = NixOSConfig {
             hostname: node.name.clone(),
             system: "x86_64-linux".to_string(),
-            modules: vec![],
             packages: vec![
                 "git".to_string(),
                 "vim".to_string(),
@@ -256,7 +310,7 @@ impl NetworkTopologyService {
             ],
             services: HashMap::new(),
             networking: HashMap::new(),
-            users: HashMap::new(),
+            users: vec![],
             extra_config: String::new(),
         };
         
@@ -265,7 +319,7 @@ impl NetworkTopologyService {
         config.networking.insert("domain".to_string(), "local".to_string());
         
         // Configure interfaces
-        for (i, iface) in node.interfaces.iter().enumerate() {
+        for (_i, iface) in node.interfaces.iter().enumerate() {
             let iface_config = format!(
                 "networking.interfaces.{} = {{\n  useDHCP = {};\n",
                 iface.name,
@@ -310,11 +364,14 @@ impl NetworkTopologyService {
                     "forwardAddresses": ["1.1.1.1", "8.8.8.8"]
                 }));
                 
-                config.networking.insert("nat".to_string(), serde_json::json!({
+                config.services.insert("nat".to_string(), serde_json::json!({
                     "enable": true,
                     "externalInterface": "wan0",
                     "internalInterfaces": ["lan0"]
                 }));
+                
+                // NAT is also a networking configuration
+                config.networking.insert("nat".to_string(), "enabled".to_string());
             }
             NodeTier::Leaf => {
                 // Leaf node services
@@ -356,5 +413,28 @@ services.cim-leaf = {{
         }
         
         Ok(config)
+    }
+    
+    /// Create a network connection
+    pub async fn create_connection(
+        &mut self,
+        cmd: CreateNetworkConnection,
+    ) -> Result<()> {
+        self.command_handler.handle_create_connection(cmd).await?;
+        self.sync_handlers();
+        Ok(())
+    }
+    
+    /// Sync state from command handler to query handler
+    fn sync_handlers(&mut self) {
+        // Copy topologies from command handler to query handler
+        for (id, topology) in &self.command_handler.topologies {
+            self.query_handler.topologies.insert(*id, topology.clone());
+        }
+        
+        // Copy nodes from command handler to query handler
+        for (id, node) in &self.command_handler.nodes {
+            self.query_handler.nodes.insert(*id, node.clone());
+        }
     }
 }

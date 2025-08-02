@@ -15,6 +15,8 @@ pub mod value_objects;
 pub mod handlers;
 pub mod services;
 
+pub use events::NetworkDomainEvent;
+
 pub use aggregate::{NetworkTopologyAggregate, NetworkNodeAggregate};
 pub use commands::{
     CreateNetworkTopology, AddNodeToTopology, RemoveNodeFromTopology,
@@ -27,7 +29,7 @@ pub use events::{
 pub use value_objects::{
     NetworkTopologyId, NetworkNodeId, NodeTier, NodeType,
     NetworkInterface, IpAddress, InterfaceType, NetworkService,
+    ConnectionType, ConnectionProperties, NetworkConnection,
 };
 pub use services::NetworkTopologyService;
 
-use crate::Result;

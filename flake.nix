@@ -82,6 +82,12 @@
           RUST_BACKTRACE = 1;
           RUST_LOG = "debug";
           
+          # OpenSSL configuration
+          OPENSSL_DIR = "${pkgs.openssl.dev}";
+          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+          
           shellHook = ''
             echo "CIM Domain Nix Development Shell"
             echo "================================"
@@ -93,6 +99,7 @@
             echo "  cargo nextest  - Run tests with nextest"
             echo "  nix build      - Build with Nix"
             echo ""
+            echo "OpenSSL configured at: $OPENSSL_DIR"
           '';
         };
       });

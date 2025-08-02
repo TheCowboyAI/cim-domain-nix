@@ -7,7 +7,68 @@ use crate::value_objects::{CorrelationId, CausationId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
+use std::any::Any;
+
+/// Wrapper enum for all network events that implements DomainEvent
+#[derive(Debug, Clone)]
+pub enum NetworkDomainEvent {
+    TopologyCreated(NetworkTopologyCreated),
+    NodeAdded(NodeAddedToTopology),
+    NodeRemoved(NodeRemovedFromTopology),
+    NodeUpdated(NodeConfigurationUpdated),
+    ConnectionCreated(NetworkConnectionCreated),
+    ConnectionRemoved(NetworkConnectionRemoved),
+}
+
+impl NetworkDomainEvent {
+    /// Get the inner event as Any for downcasting
+    pub fn as_any(&self) -> &dyn Any {
+        match self {
+            Self::TopologyCreated(e) => e,
+            Self::NodeAdded(e) => e,
+            Self::NodeRemoved(e) => e,
+            Self::NodeUpdated(e) => e,
+            Self::ConnectionCreated(e) => e,
+            Self::ConnectionRemoved(e) => e,
+        }
+    }
+}
+
+
+impl cim_domain::DomainEvent for NetworkDomainEvent {
+    fn event_type(&self) -> &'static str {
+        match self {
+            Self::TopologyCreated(_) => "NetworkTopologyCreated",
+            Self::NodeAdded(_) => "NodeAddedToTopology",
+            Self::NodeRemoved(_) => "NodeRemovedFromTopology",
+            Self::NodeUpdated(_) => "NodeConfigurationUpdated",
+            Self::ConnectionCreated(_) => "NetworkConnectionCreated",
+            Self::ConnectionRemoved(_) => "NetworkConnectionRemoved",
+        }
+    }
+    
+    fn subject(&self) -> String {
+        match self {
+            Self::TopologyCreated(e) => format!("cim.network.topology.{}.created", e.topology_id.0),
+            Self::NodeAdded(e) => format!("cim.network.topology.{}.node.added", e.topology_id.0),
+            Self::NodeRemoved(e) => format!("cim.network.topology.{}.node.removed", e.topology_id.0),
+            Self::NodeUpdated(e) => format!("cim.network.node.{}.configuration.updated", e.node_id.0),
+            Self::ConnectionCreated(e) => format!("cim.network.topology.{}.connection.created", e.topology_id.0),
+            Self::ConnectionRemoved(e) => format!("cim.network.topology.{}.connection.removed", e.topology_id.0),
+        }
+    }
+    
+    fn aggregate_id(&self) -> uuid::Uuid {
+        match self {
+            Self::TopologyCreated(e) => e.topology_id.0,
+            Self::NodeAdded(e) => e.topology_id.0,
+            Self::NodeRemoved(e) => e.topology_id.0,
+            Self::NodeUpdated(e) => e.node_id.0,
+            Self::ConnectionCreated(e) => e.topology_id.0,
+            Self::ConnectionRemoved(e) => e.topology_id.0,
+        }
+    }
+}
 
 /// Event: Network topology was created
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,16 +87,6 @@ pub struct NetworkTopologyCreated {
     pub correlation_id: CorrelationId,
     /// Causation ID
     pub causation_id: CausationId,
-}
-
-impl cim_domain::DomainEvent for NetworkTopologyCreated {
-    fn event_type(&self) -> &'static str {
-        "NetworkTopologyCreated"
-    }
-    
-    fn event_version(&self) -> &'static str {
-        "1.0"
-    }
 }
 
 /// Event: Node was added to topology
@@ -65,16 +116,6 @@ pub struct NodeAddedToTopology {
     pub causation_id: CausationId,
 }
 
-impl cim_domain::DomainEvent for NodeAddedToTopology {
-    fn event_type(&self) -> &'static str {
-        "NodeAddedToTopology"
-    }
-    
-    fn event_version(&self) -> &'static str {
-        "1.0"
-    }
-}
-
 /// Event: Node was removed from topology
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeRemovedFromTopology {
@@ -88,16 +129,6 @@ pub struct NodeRemovedFromTopology {
     pub correlation_id: CorrelationId,
     /// Causation ID
     pub causation_id: CausationId,
-}
-
-impl cim_domain::DomainEvent for NodeRemovedFromTopology {
-    fn event_type(&self) -> &'static str {
-        "NodeRemovedFromTopology"
-    }
-    
-    fn event_version(&self) -> &'static str {
-        "1.0"
-    }
 }
 
 /// Event: Node configuration was updated
@@ -125,16 +156,6 @@ pub struct NodeConfigurationUpdated {
     pub causation_id: CausationId,
 }
 
-impl cim_domain::DomainEvent for NodeConfigurationUpdated {
-    fn event_type(&self) -> &'static str {
-        "NodeConfigurationUpdated"
-    }
-    
-    fn event_version(&self) -> &'static str {
-        "1.0"
-    }
-}
-
 /// Event: Network connection was created
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConnectionCreated {
@@ -148,16 +169,6 @@ pub struct NetworkConnectionCreated {
     pub correlation_id: CorrelationId,
     /// Causation ID
     pub causation_id: CausationId,
-}
-
-impl cim_domain::DomainEvent for NetworkConnectionCreated {
-    fn event_type(&self) -> &'static str {
-        "NetworkConnectionCreated"
-    }
-    
-    fn event_version(&self) -> &'static str {
-        "1.0"
-    }
 }
 
 /// Event: Network connection was removed
@@ -175,14 +186,4 @@ pub struct NetworkConnectionRemoved {
     pub correlation_id: CorrelationId,
     /// Causation ID
     pub causation_id: CausationId,
-}
-
-impl cim_domain::DomainEvent for NetworkConnectionRemoved {
-    fn event_type(&self) -> &'static str {
-        "NetworkConnectionRemoved"
-    }
-    
-    fn event_version(&self) -> &'static str {
-        "1.0"
-    }
 }
