@@ -1,6 +1,6 @@
 [package]
 name = "cim-domain-nix"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Cowboy AI, LLC <dev@thecowboy.ai>"]
 description = "Domain-Driven Design module for comprehensive Nix ecosystem integration within CIM"
@@ -66,6 +66,7 @@ nix-editor = "0.3" # For AST manipulation
 petgraph = "0.6"  # For dependency graphs
 rayon = "1.7"     # For parallel parsing
 num_cpus = "1.16" # For parallel processing
+glob = "0.3"      # For file pattern matching
 
 [dev-dependencies]
 tokio-test = "0.4"

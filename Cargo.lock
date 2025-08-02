@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "cim-domain-nix"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-nats 0.33.0",
@@ -649,6 +649,7 @@ dependencies = [
  "cim-domain-git",
  "cim-subject 0.5.0 (git+https://github.com/TheCowboyAI/cim-subject.git?branch=main)",
  "futures",
+ "glob",
  "mockall",
  "nix-editor",
  "nom",
@@ -1377,6 +1378,12 @@ dependencies = [
  "openssl-sys",
  "url",
 ]
+
+[[package]]
+name = "glob"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
 name = "globset"

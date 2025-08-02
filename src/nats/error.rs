@@ -50,4 +50,5 @@ pub enum NatsError {
     Other(String),
 }
 
+/// Result type alias for NATS operations
 pub type Result<T> = std::result::Result<T, NatsError>;

@@ -15,18 +15,27 @@ use serde_json;
 /// Simple NixOS configuration for network nodes
 #[derive(Debug, Clone)]
 pub struct NixOSConfig {
+    /// System hostname
     pub hostname: String,
+    /// System architecture (e.g., "x86_64-linux")
     pub system: String,
+    /// System packages to install
     pub packages: Vec<String>,
+    /// Service configurations as JSON values
     pub services: HashMap<String, serde_json::Value>,
+    /// Network configuration options
     pub networking: HashMap<String, String>,
+    /// System users to create
     pub users: Vec<String>,
+    /// Additional raw Nix configuration
     pub extra_config: String,
 }
 
 /// Service for managing network topologies and generating NixOS configurations
 pub struct NetworkTopologyService {
+    /// Command handler for processing network commands
     pub command_handler: NetworkCommandHandler,
+    /// Query handler for retrieving network state
     pub query_handler: NetworkQueryHandler,
 }
 

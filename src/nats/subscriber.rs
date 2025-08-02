@@ -135,7 +135,7 @@ impl CommandSubscriber {
         debug!("Received command on subject: {}", subject);
 
         // Extract correlation/causation from headers
-        let correlation_id = msg
+        let _correlation_id = msg
             .headers
             .as_ref()
             .and_then(|h| h.get("X-Correlation-ID"))
@@ -147,7 +147,7 @@ impl CommandSubscriber {
                 CorrelationId::new()
             });
 
-        let causation_id = msg
+        let _causation_id = msg
             .headers
             .as_ref()
             .and_then(|h| h.get("X-Causation-ID"))
@@ -354,7 +354,7 @@ impl EventSubscriber {
 
         // Parse subject and deserialize event
         // This is simplified - in production you'd use an event registry
-        let parsed_subject = NixSubject::parse(subject)
+        let _parsed_subject = NixSubject::parse(subject)
             .ok_or_else(|| NatsError::InvalidSubject(subject.to_string()))?;
 
         // Deserialize based on subject (simplified)

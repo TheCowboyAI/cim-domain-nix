@@ -183,8 +183,11 @@ pub struct NetworkService {
 /// Network protocol
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ServiceProtocol {
+    /// TCP protocol
     Tcp,
+    /// UDP protocol
     Udp,
+    /// Both TCP and UDP
     Both,
 }
 

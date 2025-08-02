@@ -3,3 +3,4 @@
 //! Domain modules for CIM
 
 pub mod network;
+pub mod home_manager;

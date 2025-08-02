@@ -241,10 +241,7 @@ impl Default for ParserConfig {
 
 /// Simple parser for basic Nix expressions
 #[derive(Debug, Clone)]
-pub struct NixParser {
-    /// Parser configuration
-    config: ParserConfig,
-}
+pub struct NixParser {}
 
 impl Default for NixParser {
     fn default() -> Self {
@@ -255,9 +252,7 @@ impl Default for NixParser {
 impl NixParser {
     /// Create a new parser with default configuration
     pub fn new() -> Self {
-        Self {
-            config: ParserConfig::default(),
-        }
+        Self {}
     }
 
     /// Parse a Nix file from disk

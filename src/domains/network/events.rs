@@ -12,11 +12,17 @@ use std::any::Any;
 /// Wrapper enum for all network events that implements DomainEvent
 #[derive(Debug, Clone)]
 pub enum NetworkDomainEvent {
+    /// Network topology was created
     TopologyCreated(NetworkTopologyCreated),
+    /// Node was added to topology
     NodeAdded(NodeAddedToTopology),
+    /// Node was removed from topology
     NodeRemoved(NodeRemovedFromTopology),
+    /// Node configuration was updated
     NodeUpdated(NodeConfigurationUpdated),
+    /// Network connection was created
     ConnectionCreated(NetworkConnectionCreated),
+    /// Network connection was removed
     ConnectionRemoved(NetworkConnectionRemoved),
 }
 

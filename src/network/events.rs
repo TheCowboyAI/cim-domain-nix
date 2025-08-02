@@ -8,20 +8,30 @@ use crate::value_objects::CorrelationId;
 
 /// Handler for network domain events
 pub struct NetworkEventHandler {
+    /// Map of NATS subjects to their corresponding event types
     event_mappings: std::collections::HashMap<String, NetworkEventType>,
 }
 
 /// Types of network events we handle
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkEventType {
+    /// Network topology has been created
     TopologyCreated,
+    /// Network topology has been updated
     TopologyUpdated,
+    /// Network interface has been added
     InterfaceAdded,
+    /// Network interface has been removed
     InterfaceRemoved,
+    /// Network interface has been updated
     InterfaceUpdated,
+    /// Network route has been added
     RouteAdded,
+    /// Network route has been removed
     RouteRemoved,
+    /// Firewall rule has been added
     FirewallRuleAdded,
+    /// Firewall rule has been removed
     FirewallRuleRemoved,
 }
 
@@ -69,7 +79,7 @@ impl NetworkEventHandler {
             .ok_or_else(|| NixDomainError::Other(format!("Unknown network event subject: {}", subject)))?;
         
         // Extract correlation ID from headers
-        let correlation_id = headers
+        let _correlation_id = headers
             .get("X-Correlation-ID")
             .and_then(|value| uuid::Uuid::parse_str(value.as_str()).ok())
             .map(CorrelationId)

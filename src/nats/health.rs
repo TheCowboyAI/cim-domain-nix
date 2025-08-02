@@ -146,11 +146,17 @@ pub struct ServiceDiscovery {
 /// Service information for discovery
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct ServiceInfo {
+    /// Service name
     pub name: String,
+    /// Service version
     pub version: String,
+    /// Unique instance identifier
     pub instance_id: String,
+    /// Service description
     pub description: String,
+    /// List of service capabilities
     pub capabilities: Vec<String>,
+    /// List of exposed endpoints
     pub endpoints: Vec<String>,
 }
 

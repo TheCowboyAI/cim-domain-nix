@@ -8,9 +8,13 @@ use std::collections::HashMap;
 /// Represents a network topology
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkTopology {
+    /// Unique identifier for the topology
     pub id: uuid::Uuid,
+    /// Human-readable name of the topology
     pub name: String,
+    /// List of network nodes in this topology
     nodes: Vec<NetworkNode>,
+    /// List of connections between nodes
     connections: Vec<super::NetworkConnection>,
 }
 
@@ -74,11 +78,17 @@ impl NetworkTopology {
 /// Represents a node in the network
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkNode {
+    /// Unique identifier for the node
     pub id: uuid::Uuid,
+    /// Human-readable name of the node
     pub name: String,
+    /// Type of network node
     pub node_type: NodeType,
+    /// Network interfaces attached to this node
     pub interfaces: Vec<NetworkInterface>,
+    /// Services running on this node
     pub services: Vec<String>,
+    /// Additional metadata key-value pairs
     pub metadata: HashMap<String, String>,
 }
 
@@ -112,25 +122,40 @@ impl NetworkNode {
 /// Types of network nodes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NodeType {
+    /// Server machine providing network services
     Server,
+    /// End-user workstation or desktop
     Workstation,
+    /// Network router for packet forwarding
     Router,
+    /// Gateway connecting different networks
     Gateway,
+    /// Wireless access point
     AccessPoint,
+    /// Internet of Things device
     IoTDevice,
+    /// Container instance
     Container,
+    /// Virtual machine instance
     VirtualMachine,
 }
 
 /// Represents a network interface
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkInterface {
+    /// Interface name (e.g., eth0, wlan0)
     pub name: String,
+    /// MAC address of the interface
     pub mac_address: Option<String>,
+    /// Type of network interface
     pub interface_type: InterfaceType,
+    /// IP addresses assigned to this interface
     pub addresses: Vec<IpAddress>,
+    /// Maximum transmission unit size
     pub mtu: Option<u32>,
+    /// VLAN ID if this is a VLAN interface
     pub vlan_id: Option<u16>,
+    /// Member interfaces if this is a bridge
     pub bridge_members: Vec<String>,
 }
 
@@ -159,20 +184,30 @@ impl NetworkInterface {
 /// Types of network interfaces
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum InterfaceType {
+    /// Physical Ethernet interface
     Ethernet,
+    /// Wireless network interface
     Wifi,
+    /// Bridge interface combining multiple interfaces
     Bridge,
+    /// Virtual LAN interface
     Vlan,
+    /// WireGuard VPN interface
     Wireguard,
+    /// Loopback interface (lo)
     Loopback,
+    /// Virtual network interface
     Virtual,
 }
 
 /// IP address configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpAddress {
+    /// IP address (IPv4 or IPv6)
     pub address: String,
+    /// Network prefix length (e.g., 24 for /24)
     pub prefix_length: u8,
+    /// Whether this address is obtained via DHCP
     pub dhcp: bool,
 }
 
@@ -208,17 +243,24 @@ impl IpAddress {
 /// Network service configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkService {
+    /// Service name (e.g., ssh, http)
     pub name: String,
+    /// Port number if applicable
     pub port: Option<u16>,
+    /// Network protocol used by the service
     pub protocol: ServiceProtocol,
+    /// Whether the service is publicly accessible
     pub public: bool,
 }
 
 /// Service protocols
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServiceProtocol {
+    /// TCP protocol only
     Tcp,
+    /// UDP protocol only
     Udp,
+    /// Both TCP and UDP protocols
     Both,
 }
 

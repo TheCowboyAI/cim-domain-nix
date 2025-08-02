@@ -499,41 +499,6 @@ impl NetworkSystemBuilder {
         })
     }
     
-    // Network calculation helpers
-    fn extract_network<'a>(&self, cidr: &'a str) -> &'a str {
-        cidr.split('/').next().unwrap_or("192.168.1.0")
-    }
-    
-    fn extract_netmask(&self, cidr: &str) -> &'static str {
-        match cidr.split('/').nth(1).and_then(|p| p.parse::<u8>().ok()) {
-            Some(24) => "255.255.255.0",
-            Some(16) => "255.255.0.0",
-            Some(8) => "255.0.0.0",
-            _ => "255.255.255.0",
-        }
-    }
-    
-    fn calculate_dhcp_start(&self, cidr: &str) -> String {
-        // Simple implementation - would be more sophisticated in production
-        let network = self.extract_network(cidr);
-        let parts: Vec<&str> = network.split('.').collect();
-        if parts.len() == 4 {
-            format!("{}.{}.{}.100", parts[0], parts[1], parts[2])
-        } else {
-            "192.168.1.100".to_string()
-        }
-    }
-    
-    fn calculate_dhcp_end(&self, cidr: &str) -> String {
-        let network = self.extract_network(cidr);
-        let parts: Vec<&str> = network.split('.').collect();
-        if parts.len() == 4 {
-            format!("{}.{}.{}.200", parts[0], parts[1], parts[2])
-        } else {
-            "192.168.1.200".to_string()
-        }
-    }
-    
     fn get_router_ip(&self, node: &NetworkNode) -> String {
         node.primary_interface()
             .and_then(|i| {

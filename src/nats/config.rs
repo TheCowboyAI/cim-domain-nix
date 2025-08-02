@@ -29,6 +29,7 @@ pub struct NatsConfig {
 pub struct NatsAuth {
     /// Username/password authentication
     pub username: Option<String>,
+    /// Password for authentication
     pub password: Option<String>,
 
     /// Token authentication

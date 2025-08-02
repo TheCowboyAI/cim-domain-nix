@@ -13,10 +13,15 @@ pub const DOMAIN: &str = "nix";
 /// Aggregate types in the Nix domain
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Aggregate {
+    /// Nix flake aggregate
     Flake,
+    /// Nix package aggregate
     Package,
+    /// Nix module aggregate
     Module,
+    /// Nix overlay aggregate
     Overlay,
+    /// NixOS configuration aggregate
     Configuration,
 }
 
@@ -35,8 +40,11 @@ impl fmt::Display for Aggregate {
 /// Message types following CIM conventions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessageType {
+    /// Command message type
     Command,
+    /// Event message type
     Event,
+    /// Query message type
     Query,
 }
 
@@ -54,33 +62,50 @@ impl fmt::Display for MessageType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandAction {
     // Flake commands
+    /// Create a new Nix flake
     CreateFlake,
+    /// Update an existing flake
     UpdateFlake,
+    /// Add an input to a flake
     AddFlakeInput,
+    /// Remove an input from a flake
     RemoveFlakeInput,
 
     // Package commands
+    /// Build a Nix package
     BuildPackage,
+    /// Cache a built package
     CachePackage,
 
     // Module commands
+    /// Create a new Nix module
     CreateModule,
+    /// Update an existing module
     UpdateModule,
+    /// Delete a module
     DeleteModule,
 
     // Overlay commands
+    /// Create a new overlay
     CreateOverlay,
+    /// Update an existing overlay
     UpdateOverlay,
+    /// Delete an overlay
     DeleteOverlay,
 
     // Configuration commands
+    /// Create a new configuration
     CreateConfiguration,
+    /// Update an existing configuration
     UpdateConfiguration,
+    /// Activate a configuration
     ActivateConfiguration,
+    /// Rollback to a previous configuration
     RollbackConfiguration,
 }
 
 impl CommandAction {
+    /// Get the string representation of the command action
     pub fn as_str(&self) -> &'static str {
         match self {
             // Flake commands
@@ -111,6 +136,7 @@ impl CommandAction {
         }
     }
 
+    /// Get the aggregate type for this command action
     pub fn aggregate(&self) -> Aggregate {
         match self {
             CommandAction::CreateFlake
@@ -140,33 +166,50 @@ impl CommandAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventAction {
     // Flake events
+    /// A flake has been created
     FlakeCreated,
+    /// A flake has been updated
     FlakeUpdated,
+    /// An input has been added to a flake
     FlakeInputAdded,
+    /// An input has been removed from a flake
     FlakeInputRemoved,
 
     // Package events
+    /// A package has been built
     PackageBuilt,
+    /// A package has been cached
     PackageCached,
 
     // Module events
+    /// A module has been created
     ModuleCreated,
+    /// A module has been updated
     ModuleUpdated,
+    /// A module has been deleted
     ModuleDeleted,
 
     // Overlay events
+    /// An overlay has been created
     OverlayCreated,
+    /// An overlay has been updated
     OverlayUpdated,
+    /// An overlay has been deleted
     OverlayDeleted,
 
     // Configuration events
+    /// A configuration has been created
     ConfigurationCreated,
+    /// A configuration has been updated
     ConfigurationUpdated,
+    /// A configuration has been activated
     ConfigurationActivated,
+    /// A configuration has been rolled back
     ConfigurationRolledBack,
 }
 
 impl EventAction {
+    /// Get the string representation of the event action
     pub fn as_str(&self) -> &'static str {
         match self {
             // Flake events
@@ -197,6 +240,7 @@ impl EventAction {
         }
     }
 
+    /// Get the aggregate type for this event action
     pub fn aggregate(&self) -> Aggregate {
         match self {
             EventAction::FlakeCreated
@@ -226,31 +270,46 @@ impl EventAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryAction {
     // Flake queries
+    /// Get a specific flake by ID
     GetFlake,
+    /// List all flakes
     ListFlakes,
+    /// Get the inputs of a flake
     GetFlakeInputs,
 
     // Package queries
+    /// Get a specific package by ID
     GetPackage,
+    /// List all packages
     ListPackages,
+    /// Get the build status of a package
     GetBuildStatus,
 
     // Module queries
+    /// Get a specific module by ID
     GetModule,
+    /// List all modules
     ListModules,
 
     // Overlay queries
+    /// Get a specific overlay by ID
     GetOverlay,
+    /// List all overlays
     ListOverlays,
 
     // Configuration queries
+    /// Get a specific configuration by ID
     GetConfiguration,
+    /// List all configurations
     ListConfigurations,
+    /// Get the currently active configuration
     GetCurrentConfiguration,
+    /// Get the history of configuration changes
     GetConfigurationHistory,
 }
 
 impl QueryAction {
+    /// Get the string representation of the query action
     pub fn as_str(&self) -> &'static str {
         match self {
             // Flake queries
@@ -279,6 +338,7 @@ impl QueryAction {
         }
     }
 
+    /// Get the aggregate type for this query action
     pub fn aggregate(&self) -> Aggregate {
         match self {
             QueryAction::GetFlake | QueryAction::ListFlakes | QueryAction::GetFlakeInputs => {

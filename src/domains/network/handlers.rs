@@ -11,8 +11,9 @@ use std::collections::HashMap;
 
 /// Command handler for network domain
 pub struct NetworkCommandHandler {
-    // In a real implementation, this would connect to event store
+    /// Map of topology IDs to their aggregates (in-memory store)
     pub topologies: HashMap<NetworkTopologyId, NetworkTopologyAggregate>,
+    /// Map of node IDs to their aggregates (in-memory store)
     pub nodes: HashMap<NetworkNodeId, NetworkNodeAggregate>,
 }
 
@@ -162,8 +163,9 @@ impl NetworkCommandHandler {
 
 /// Query handler for network domain
 pub struct NetworkQueryHandler {
-    // In a real implementation, this would query event store
+    /// Map of topology IDs to their aggregates (read-side projection)
     pub topologies: HashMap<NetworkTopologyId, NetworkTopologyAggregate>,
+    /// Map of node IDs to their aggregates (read-side projection)
     pub nodes: HashMap<NetworkNodeId, NetworkNodeAggregate>,
 }
 
@@ -233,22 +235,35 @@ impl NetworkQueryHandler {
 /// Read model view of a network topology
 #[derive(Debug, Clone)]
 pub struct NetworkTopologyView {
+    /// Unique topology identifier
     pub id: NetworkTopologyId,
+    /// Human-readable topology name
     pub name: String,
+    /// Topology description
     pub description: String,
+    /// List of nodes in this topology
     pub nodes: Vec<NetworkNodeView>,
+    /// Network connections between nodes
     pub connections: Vec<NetworkConnection>,
+    /// Additional topology metadata
     pub metadata: HashMap<String, String>,
 }
 
 /// Read model view of a network node
 #[derive(Debug, Clone)]
 pub struct NetworkNodeView {
+    /// Unique node identifier
     pub id: NetworkNodeId,
+    /// Node hostname or display name
     pub name: String,
+    /// Type of network node (Router, Switch, Server, etc.)
     pub node_type: NodeType,
+    /// Hierarchical tier (SuperCluster, Cluster, Leaf, Client)
     pub tier: NodeTier,
+    /// Network interfaces configured on this node
     pub interfaces: Vec<NetworkInterface>,
+    /// Services running on this node
     pub services: Vec<String>,
+    /// Additional node metadata
     pub metadata: HashMap<String, String>,
 }
