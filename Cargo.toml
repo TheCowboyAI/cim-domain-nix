@@ -123,3 +123,15 @@ path = "examples/distributed_ecs_demo.rs"
 [[example]]
 name = "network_integration_demo"
 path = "examples/network_integration_demo.rs"
+
+[[example]]
+name = "starlink_topology_demo"
+path = "examples/starlink_topology_demo.rs"
+
+[[example]]
+name = "simple_topology_demo"
+path = "examples/simple_topology_demo.rs"
+
+[[example]]
+name = "cim_network_starlink_demo"
+path = "examples/cim_network_starlink_demo.rs"

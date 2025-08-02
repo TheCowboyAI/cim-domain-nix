@@ -74,6 +74,7 @@ pub mod handlers;
 pub mod home_manager;
 pub mod nats;
 pub mod network;
+pub mod domains;
 pub mod parser;
 pub mod projections;
 pub mod queries;
