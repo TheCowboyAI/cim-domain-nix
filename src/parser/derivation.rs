@@ -23,7 +23,7 @@ impl DerivationParser {
     /// Parse a derivation from a Nix file
     pub fn parse(_file: &NixFile) -> Result<ParsedDerivation> {
         // TODO: Implement actual parsing logic
-        
+
         Ok(ParsedDerivation {
             drv_path: "/nix/store/dummy.drv".to_string(),
             outputs: vec!["/nix/store/dummy-out".to_string()],
@@ -31,4 +31,4 @@ impl DerivationParser {
             dependencies: vec![],
         })
     }
-} 
+}

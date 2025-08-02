@@ -4,26 +4,26 @@
 //! including dependency graphs, security scanning, performance analysis,
 //! and dead code detection.
 
-pub mod dependency;
-pub mod security;
-pub mod performance;
 pub mod dead_code;
+pub mod dependency;
+pub mod performance;
+pub mod security;
 
+use crate::formatter::{FormatterService, NixFormatter};
 use crate::parser::NixFile;
-use crate::{Result, NixDomainError};
-use crate::formatter::{NixFormatter, FormatterService};
+use crate::{NixDomainError, Result};
 use petgraph::graph::DiGraph;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
-use std::sync::Arc;
 use uuid::Uuid;
 
-pub use dependency::{DependencyAnalyzer, DependencyGraph, FileNode, DependencyEdge};
-pub use security::{SecurityAnalyzer, SecurityIssue, Severity};
+pub use dead_code::{DeadCode, DeadCodeAnalyzer};
+pub use dependency::{DependencyAnalyzer, DependencyEdge, DependencyGraph, FileNode};
 pub use performance::{PerformanceAnalyzer, PerformanceIssue};
-pub use dead_code::{DeadCodeAnalyzer, DeadCode};
+pub use security::{SecurityAnalyzer, SecurityIssue, Severity};
 
 /// Main analyzer that coordinates all analysis types
 pub struct NixAnalyzer {
@@ -77,7 +77,7 @@ pub struct AnalysisReport {
     /// Number of files analyzed
     pub files_analyzed: usize,
     /// Dependency graph
-    #[serde(skip)]  // Skip graph for now as it's not easily serializable
+    #[serde(skip)] // Skip graph for now as it's not easily serializable
     pub dependency_graph: DiGraph<FileNode, DependencyEdge>,
     /// Security issues found
     pub security_issues: Vec<SecurityIssue>,
@@ -119,7 +119,7 @@ impl NixAnalyzer {
 
         // Find all Nix files
         let nix_files = self.find_nix_files(repo_path).await?;
-        
+
         // Parse all files
         let parsed_files = if self.config.parallel_parsing {
             self.parse_files_parallel(nix_files.clone()).await?
@@ -132,20 +132,22 @@ impl NixAnalyzer {
 
         // Run analyzers
         let dep_graph = self.dep_graph.lock().await.clone();
-        
+
         let security_issues = SecurityAnalyzer::analyze(&parsed_files)?;
         let performance_issues = PerformanceAnalyzer::analyze(&parsed_files)?;
         let dead_code = DeadCodeAnalyzer::analyze(&parsed_files, &dep_graph)?;
 
         // Check formatting if enabled
         let formatting_issues = if self.config.check_formatting {
-            let formatter = self.config.formatter
+            let formatter = self
+                .config
+                .formatter
                 .or(NixFormatter::detect_from_project(repo_path).await);
-            
+
             if let Some(formatter) = formatter {
                 let service = FormatterService::check_only(formatter);
                 let report = service.format_directory(repo_path).await?;
-                
+
                 if report.all_formatted() {
                     Some(Vec::new())
                 } else {
@@ -178,23 +180,22 @@ impl NixAnalyzer {
         let mut dirs_to_visit = vec![path.to_path_buf()];
 
         while let Some(dir) = dirs_to_visit.pop() {
-            let mut entries = fs::read_dir(&dir).await
-                .map_err(NixDomainError::IoError)?;
+            let mut entries = fs::read_dir(&dir).await.map_err(NixDomainError::IoError)?;
 
-            while let Some(entry) = entries.next_entry().await
-                .map_err(NixDomainError::IoError)? {
+            while let Some(entry) = entries
+                .next_entry()
+                .await
+                .map_err(NixDomainError::IoError)?
+            {
                 let path = entry.path();
-                let file_name = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("");
+                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
                 // Check ignore patterns
                 if self.should_ignore(file_name) {
                     continue;
                 }
 
-                let file_type = entry.file_type().await
-                    .map_err(NixDomainError::IoError)?;
+                let file_type = entry.file_type().await.map_err(NixDomainError::IoError)?;
 
                 if file_type.is_dir() {
                     dirs_to_visit.push(path);
@@ -216,16 +217,15 @@ impl NixAnalyzer {
 
     /// Check if a file should be ignored
     fn should_ignore(&self, file_name: &str) -> bool {
-        self.config.ignore_patterns.iter()
-            .any(|pattern| {
-                if pattern.contains('*') {
-                    // Simple glob matching
-                    let pattern = pattern.replace('*', "");
-                    file_name.starts_with(&pattern) || file_name.ends_with(&pattern)
-                } else {
-                    file_name == pattern
-                }
-            })
+        self.config.ignore_patterns.iter().any(|pattern| {
+            if pattern.contains('*') {
+                // Simple glob matching
+                let pattern = pattern.replace('*', "");
+                file_name.starts_with(&pattern) || file_name.ends_with(&pattern)
+            } else {
+                file_name == pattern
+            }
+        })
     }
 
     /// Parse files in parallel
@@ -233,9 +233,7 @@ impl NixAnalyzer {
         use futures::stream::{self, StreamExt};
 
         let results: Vec<Result<NixFile>> = stream::iter(paths)
-            .map(|path| async move {
-                NixFile::parse_file(&path)
-            })
+            .map(|path| async move { NixFile::parse_file(&path) })
             .buffer_unordered(num_cpus::get())
             .collect()
             .await;
@@ -306,11 +304,12 @@ impl NixAnalyzer {
             if let Some(ref source_path) = file.source {
                 if let Some(&source_idx) = node_map.get(source_path) {
                     let deps = DependencyAnalyzer::find_dependencies(file)?;
-                    
+
                     for dep in deps {
                         // Resolve relative paths
                         let dep_path = if dep.path.is_relative() {
-                            source_path.parent()
+                            source_path
+                                .parent()
                                 .unwrap_or(Path::new("."))
                                 .join(&dep.path)
                         } else {
@@ -353,7 +352,9 @@ mod tests {
         // Create test files
         fs::write(temp_path.join("test1.nix"), "{ }").await.unwrap();
         fs::write(temp_path.join("test2.nix"), "{ }").await.unwrap();
-        fs::write(temp_path.join("other.txt"), "not nix").await.unwrap();
+        fs::write(temp_path.join("other.txt"), "not nix")
+            .await
+            .unwrap();
 
         let analyzer = NixAnalyzer::new();
         let files = analyzer.find_nix_files(temp_path).await.unwrap();
@@ -370,7 +371,9 @@ mod tests {
         // Create test files
         fs::write(temp_path.join("test.nix"), "{ }").await.unwrap();
         fs::create_dir(temp_path.join("result")).await.unwrap();
-        fs::write(temp_path.join("result").join("ignored.nix"), "{ }").await.unwrap();
+        fs::write(temp_path.join("result").join("ignored.nix"), "{ }")
+            .await
+            .unwrap();
 
         let analyzer = NixAnalyzer::new();
         let files = analyzer.find_nix_files(temp_path).await.unwrap();
@@ -378,4 +381,4 @@ mod tests {
         assert_eq!(files.len(), 1);
         assert!(!files[0].to_string_lossy().contains("result"));
     }
-} 
+}

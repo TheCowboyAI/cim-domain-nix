@@ -3,27 +3,30 @@
 //! This module provides comprehensive parsing capabilities for all Nix file types,
 //! including flakes, modules, overlays, and derivations.
 
+pub mod advanced;
 pub mod ast;
+pub mod derivation;
 pub mod error;
 pub mod flake;
-pub mod module;
-pub mod derivation;
-pub mod advanced;
 pub mod manipulator;
+pub mod module;
 
-use rnix::{SyntaxNode, SyntaxKind};
-use rnix::tokenizer::tokenize;
+use crate::{NixDomainError, Result};
 use rnix::parser;
+use rnix::tokenizer::tokenize;
+use rnix::{SyntaxKind, SyntaxNode};
 use rowan::GreenNode;
 use std::path::{Path, PathBuf};
-use crate::{Result, NixDomainError};
 
+pub use advanced::AdvancedParser;
+pub use ast::{
+    AttrPath, AttrPathSegment, BinaryOperator, Binding, BindingValue, FunctionParam, NixAst,
+    UnaryOperator,
+};
 pub use error::ParseError;
 pub use flake::{FlakeParser, ParsedFlake};
+pub use manipulator::{AstBuilder, AstManipulator};
 pub use module::{ModuleParser, ParsedModule};
-pub use ast::{NixAst, FunctionParam, AttrPath, Binding, BinaryOperator, UnaryOperator, AttrPathSegment, BindingValue};
-pub use advanced::AdvancedParser;
-pub use manipulator::{AstManipulator, AstBuilder};
 
 /// A parsed Nix file with its AST and metadata
 #[derive(Debug, Clone)]
@@ -43,8 +46,7 @@ pub struct NixFile {
 impl NixFile {
     /// Parse a Nix file from disk
     pub fn parse_file(path: &Path) -> Result<Self> {
-        let content = std::fs::read_to_string(path)
-            .map_err(NixDomainError::IoError)?;
+        let content = std::fs::read_to_string(path).map_err(NixDomainError::IoError)?;
         Self::parse_string(content, Some(path.to_path_buf()))
     }
 
@@ -52,10 +54,10 @@ impl NixFile {
     pub fn parse_string(content: String, source: Option<PathBuf>) -> Result<Self> {
         // Tokenize first
         let tokens = tokenize(&content);
-        
+
         // Then parse - tokenize returns a Vec, but parse expects an iterator
         let (green, parse_errors) = parser::parse(tokens.into_iter());
-        
+
         let errors = parse_errors
             .into_iter()
             .map(ParseError::from_rnix)
@@ -88,11 +90,10 @@ impl NixFile {
         // TODO: Implement proper formatting
         Ok(self.content.clone())
     }
-    
+
     /// Parse to our `NixAst` representation
     pub fn to_ast(&self) -> Result<NixAst> {
-        ast::from_syntax_node(&self.ast)
-            .map_err(|e| NixDomainError::ParseError(e.to_string()))
+        ast::from_syntax_node(&self.ast).map_err(|e| NixDomainError::ParseError(e.to_string()))
     }
 }
 
@@ -132,45 +133,42 @@ impl NixFileType {
 
     fn is_flake(ast: &SyntaxNode) -> bool {
         // A flake has the structure: { description = ...; inputs = ...; outputs = ...; }
-        ast.children()
-            .any(|child| {
-                if child.kind() == SyntaxKind::NODE_ATTR_SET {
-                    let has_description = Self::has_attribute(&child, "description");
-                    let has_outputs = Self::has_attribute(&child, "outputs");
-                    has_description && has_outputs
-                } else {
-                    false
-                }
-            })
+        ast.children().any(|child| {
+            if child.kind() == SyntaxKind::NODE_ATTR_SET {
+                let has_description = Self::has_attribute(&child, "description");
+                let has_outputs = Self::has_attribute(&child, "outputs");
+                has_description && has_outputs
+            } else {
+                false
+            }
+        })
     }
 
     fn is_module(ast: &SyntaxNode) -> bool {
         // A module typically has: { options = ...; config = ...; } or { imports = ...; }
-        ast.children()
-            .any(|child| {
-                if child.kind() == SyntaxKind::NODE_ATTR_SET {
-                    let has_options = Self::has_attribute(&child, "options");
-                    let has_config = Self::has_attribute(&child, "config");
-                    let has_imports = Self::has_attribute(&child, "imports");
-                    (has_options && has_config) || has_imports
-                } else {
-                    false
-                }
-            })
+        ast.children().any(|child| {
+            if child.kind() == SyntaxKind::NODE_ATTR_SET {
+                let has_options = Self::has_attribute(&child, "options");
+                let has_config = Self::has_attribute(&child, "config");
+                let has_imports = Self::has_attribute(&child, "imports");
+                (has_options && has_config) || has_imports
+            } else {
+                false
+            }
+        })
     }
 
     fn is_overlay(ast: &SyntaxNode) -> bool {
         // An overlay has the pattern: self: super: { ... }
         // Look for a lambda with two parameters
-        ast.children()
-            .any(|child| {
-                if child.kind() == SyntaxKind::NODE_LAMBDA {
-                    // Check if it has the self: super: pattern
-                    Self::count_lambda_params(&child) >= 2
-                } else {
-                    false
-                }
-            })
+        ast.children().any(|child| {
+            if child.kind() == SyntaxKind::NODE_LAMBDA {
+                // Check if it has the self: super: pattern
+                Self::count_lambda_params(&child) >= 2
+            } else {
+                false
+            }
+        })
     }
 
     fn is_derivation(ast: &SyntaxNode) -> bool {
@@ -179,18 +177,17 @@ impl NixFileType {
     }
 
     fn has_attribute(node: &SyntaxNode, attr_name: &str) -> bool {
-        node.children()
-            .any(|child| {
-                // In rnix 0.11, key-value pairs might have a different syntax kind
-                // For now, just check if the text contains the attribute
-                child.text().to_string().contains(attr_name)
-            })
+        node.children().any(|child| {
+            // In rnix 0.11, key-value pairs might have a different syntax kind
+            // For now, just check if the text contains the attribute
+            child.text().to_string().contains(attr_name)
+        })
     }
 
     fn count_lambda_params(lambda_node: &SyntaxNode) -> usize {
         let mut count = 0;
         let mut current = lambda_node.clone();
-        
+
         while current.kind() == SyntaxKind::NODE_LAMBDA {
             count += 1;
             // Move to the body of the lambda
@@ -200,7 +197,7 @@ impl NixFileType {
                 break;
             }
         }
-        
+
         count
     }
 
@@ -212,8 +209,9 @@ impl NixFileType {
                 return true;
             }
         }
-        
-        node.children().any(|child| Self::contains_derivation_call(&child))
+
+        node.children()
+            .any(|child| Self::contains_derivation_call(&child))
     }
 }
 
@@ -261,7 +259,7 @@ impl NixParser {
             config: ParserConfig::default(),
         }
     }
-    
+
     /// Parse a Nix file from disk
     pub fn parse_file(&self, path: &Path) -> Result<ParsedFile> {
         let nix_file = NixFile::parse_file(path)?;
@@ -271,7 +269,7 @@ impl NixParser {
             errors: nix_file.errors,
         })
     }
-    
+
     /// Parse Nix content from a string
     pub fn parse_string(&self, content: &str) -> Result<ParsedFile> {
         let nix_file = NixFile::parse_string(content.to_string(), None)?;
@@ -350,18 +348,17 @@ impl NixExpr {
                         let text = node.text().to_string();
                         NixExpr::Float(text.parse().unwrap_or(0.0))
                     }
-                    SyntaxKind::NODE_IDENT => {
-                        NixExpr::Identifier(node.text().to_string())
-                    }
+                    SyntaxKind::NODE_IDENT => NixExpr::Identifier(node.text().to_string()),
                     SyntaxKind::NODE_LIST => {
-                        let items = node.children()
+                        let items = node
+                            .children()
                             .map(|child| NixExpr::from_ast(&child))
                             .collect();
                         NixExpr::List(items)
                     }
                     SyntaxKind::NODE_ATTR_SET => {
                         let mut attrs = std::collections::HashMap::new();
-                        
+
                         // Simple attribute extraction - this is a simplified version
                         for child in node.children() {
                             if let Some(key_node) = child.children().next() {
@@ -372,7 +369,7 @@ impl NixExpr {
                                 }
                             }
                         }
-                        
+
                         NixExpr::AttrSet(attrs)
                     }
                     _ => NixExpr::Other(node.text().to_string()),
@@ -380,7 +377,7 @@ impl NixExpr {
             }
         }
     }
-    
+
     /// Convert from our `NixAst` to `NixExpr`
     fn from_nix_ast(ast: NixAst) -> Self {
         match ast {
@@ -392,9 +389,7 @@ impl NixExpr {
             NixAst::Null => NixExpr::Other("null".to_string()),
             NixAst::Identifier(id) => NixExpr::Identifier(id),
             NixAst::List(items) => {
-                let exprs = items.into_iter()
-                    .map(Self::from_nix_ast)
-                    .collect();
+                let exprs = items.into_iter().map(Self::from_nix_ast).collect();
                 NixExpr::List(exprs)
             }
             NixAst::AttrSet { bindings, .. } => {
@@ -418,12 +413,10 @@ impl NixExpr {
                 };
                 NixExpr::Lambda(param_name, Box::new(Self::from_nix_ast(*body)))
             }
-            NixAst::Apply { function, argument } => {
-                NixExpr::Apply(
-                    Box::new(Self::from_nix_ast(*function)),
-                    Box::new(Self::from_nix_ast(*argument))
-                )
-            }
+            NixAst::Apply { function, argument } => NixExpr::Apply(
+                Box::new(Self::from_nix_ast(*function)),
+                Box::new(Self::from_nix_ast(*argument)),
+            ),
             NixAst::Let { bindings, body } => {
                 let mut let_bindings = Vec::new();
                 for binding in bindings {
@@ -437,25 +430,25 @@ impl NixExpr {
                 }
                 NixExpr::Let(let_bindings, Box::new(Self::from_nix_ast(*body)))
             }
-            NixAst::If { condition, then_branch, else_branch } => {
-                NixExpr::If(
-                    Box::new(Self::from_nix_ast(*condition)),
-                    Box::new(Self::from_nix_ast(*then_branch)),
-                    Box::new(Self::from_nix_ast(*else_branch))
-                )
-            }
-            NixAst::With { namespace, body } => {
-                NixExpr::With(
-                    Box::new(Self::from_nix_ast(*namespace)),
-                    Box::new(Self::from_nix_ast(*body))
-                )
-            }
+            NixAst::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => NixExpr::If(
+                Box::new(Self::from_nix_ast(*condition)),
+                Box::new(Self::from_nix_ast(*then_branch)),
+                Box::new(Self::from_nix_ast(*else_branch)),
+            ),
+            NixAst::With { namespace, body } => NixExpr::With(
+                Box::new(Self::from_nix_ast(*namespace)),
+                Box::new(Self::from_nix_ast(*body)),
+            ),
             _ => NixExpr::Other(format!("{ast:?}")),
         }
     }
 }
 
 #[cfg(test)]
-mod tests;
+mod module_tests;
 #[cfg(test)]
-mod module_tests; 
+mod tests;

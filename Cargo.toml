@@ -30,7 +30,7 @@ bytes = "1.5"
 # Domain dependencies
 cim-domain = { git = "https://github.com/TheCowboyAI/cim-domain.git", branch = "main" }
 cim-subject = { git = "https://github.com/TheCowboyAI/cim-subject.git", branch = "main" }
-# cim-domain-git = { path = "../cim-domain-git" }
+cim-domain-git = { git = "https://github.com/TheCowboyAI/cim-domain-git.git", tag = "v0.5.0" }
 
 # Nix-specific dependencies
 tempfile = "3.8"

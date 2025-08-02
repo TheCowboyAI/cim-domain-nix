@@ -66,7 +66,8 @@ impl DeadCodeAnalyzer {
 
         // Sort by file and type
         dead_code.sort_by(|a, b| {
-            a.file.cmp(&b.file)
+            a.file
+                .cmp(&b.file)
                 .then_with(|| a.code_type.cmp(&b.code_type))
                 .then_with(|| a.name.cmp(&b.name))
         });
@@ -81,7 +82,7 @@ impl DeadCodeAnalyzer {
         // Build symbol tables
         let mut defined_symbols = HashSet::new();
         let mut used_symbols = HashSet::new();
-        
+
         Self::collect_symbols(&file.ast, &mut defined_symbols, &mut used_symbols)?;
 
         // Find unused definitions
@@ -116,7 +117,7 @@ impl DeadCodeAnalyzer {
             SyntaxKind::NODE_LET_IN => {
                 Self::collect_let_bindings(node, defined)?;
             }
-            
+
             // Function parameters define symbols
             SyntaxKind::NODE_LAMBDA => {
                 if let Some(param) = node.children().find(|n| n.kind() == SyntaxKind::NODE_IDENT) {
@@ -155,9 +156,15 @@ impl DeadCodeAnalyzer {
         for child in let_node.children() {
             if child.kind() == SyntaxKind::NODE_ATTRPATH_VALUE {
                 // Get the attrpath which contains the identifier
-                if let Some(attrpath) = child.children().find(|n| n.kind() == SyntaxKind::NODE_ATTRPATH) {
+                if let Some(attrpath) = child
+                    .children()
+                    .find(|n| n.kind() == SyntaxKind::NODE_ATTRPATH)
+                {
                     // Get the identifier from the attrpath
-                    if let Some(ident) = attrpath.children().find(|n| n.kind() == SyntaxKind::NODE_IDENT) {
+                    if let Some(ident) = attrpath
+                        .children()
+                        .find(|n| n.kind() == SyntaxKind::NODE_IDENT)
+                    {
                         let name = ident.text().to_string();
                         defined.insert(name);
                     }
@@ -175,7 +182,7 @@ impl DeadCodeAnalyzer {
         for child in attr_set.children() {
             let text = child.text().to_string();
             let trimmed = text.trim();
-            
+
             // Look for attribute assignments
             if trimmed.contains('=') && !trimmed.starts_with('#') {
                 // Extract the key part
@@ -232,30 +239,38 @@ impl DeadCodeAnalyzer {
         // Look for throw or abort in let bindings
         if node.kind() == SyntaxKind::NODE_LET_IN {
             let mut found_throw = false;
-            
+
             // Check each binding (direct children of NODE_LET_IN)
             for binding in node.children() {
                 if binding.kind() == SyntaxKind::NODE_ATTRPATH_VALUE {
                     let binding_text = binding.text().to_string();
-                    
+
                     // If we already found a throw, this binding is unreachable
                     if found_throw {
                         // Get the identifier from the attrpath
-                        if let Some(attrpath) = binding.children().find(|n| n.kind() == SyntaxKind::NODE_ATTRPATH) {
-                            if let Some(ident) = attrpath.children().find(|n| n.kind() == SyntaxKind::NODE_IDENT) {
+                        if let Some(attrpath) = binding
+                            .children()
+                            .find(|n| n.kind() == SyntaxKind::NODE_ATTRPATH)
+                        {
+                            if let Some(ident) = attrpath
+                                .children()
+                                .find(|n| n.kind() == SyntaxKind::NODE_IDENT)
+                            {
                                 let name = ident.text().to_string();
                                 dead_code.push(DeadCode {
                                     code_type: DeadCodeType::UnreachableCode,
                                     name: format!("binding '{name}'"),
                                     file: file.as_ref().map(|p| p.display().to_string()),
                                     line: None,
-                                    context: Some("Code after throw/abort is unreachable".to_string()),
+                                    context: Some(
+                                        "Code after throw/abort is unreachable".to_string(),
+                                    ),
                                     suggestion: "Remove unreachable code".to_string(),
                                 });
                             }
                         }
                     }
-                    
+
                     // Check if this binding contains throw or abort
                     if binding_text.contains("throw") || binding_text.contains("abort") {
                         found_throw = true;
@@ -280,7 +295,12 @@ impl DeadCodeAnalyzer {
         let mut dead_code = Vec::new();
         let mut seen_definitions = HashMap::new();
 
-        Self::check_redundant_definitions_recursive(node, file, &mut seen_definitions, &mut dead_code)?;
+        Self::check_redundant_definitions_recursive(
+            node,
+            file,
+            &mut seen_definitions,
+            &mut dead_code,
+        )?;
 
         Ok(dead_code)
     }
@@ -295,12 +315,12 @@ impl DeadCodeAnalyzer {
         // Look for attribute assignments
         let text = node.text().to_string();
         let trimmed = text.trim();
-        
+
         if trimmed.contains('=') && !trimmed.starts_with('#') {
             // Extract the key part
             if let Some(key_part) = trimmed.split('=').next() {
                 let name = key_part.trim();
-                
+
                 // Skip if it's a complex expression
                 if !name.contains(' ') && !name.contains('.') {
                     if let Some(&count) = seen.get(name) {
@@ -340,12 +360,16 @@ impl DeadCodeAnalyzer {
         // Find files with no incoming edges (not imported by anything)
         for node_idx in graph.node_indices() {
             let node = &graph[node_idx];
-            let incoming_count = graph.edges_directed(node_idx, petgraph::Direction::Incoming).count();
-            
+            let incoming_count = graph
+                .edges_directed(node_idx, petgraph::Direction::Incoming)
+                .count();
+
             if incoming_count == 0 && !Self::is_entry_point(&node.path) {
                 dead_code.push(DeadCode {
                     code_type: DeadCodeType::UnusedFile,
-                    name: node.path.file_name()
+                    name: node
+                        .path
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("unknown")
                         .to_string(),
@@ -398,9 +422,9 @@ mod tests {
             eprintln!("  - Type: {:?}, Name: {}", dc.code_type, dc.name);
         }
 
-        assert!(dead_code.iter().any(|d| {
-            d.code_type == DeadCodeType::UnusedVariable && d.name == "unused"
-        }));
+        assert!(dead_code
+            .iter()
+            .any(|d| { d.code_type == DeadCodeType::UnusedVariable && d.name == "unused" }));
     }
 
     #[test]
@@ -416,9 +440,9 @@ mod tests {
         let graph = DiGraph::new();
         let dead_code = DeadCodeAnalyzer::analyze(&[file], &graph).unwrap();
 
-        assert!(dead_code.iter().any(|d| {
-            d.code_type == DeadCodeType::UnreachableCode
-        }));
+        assert!(dead_code
+            .iter()
+            .any(|d| { d.code_type == DeadCodeType::UnreachableCode }));
     }
 
     #[test]
@@ -437,4 +461,4 @@ mod tests {
         // Should not report helper as unused
         assert!(!dead_code.iter().any(|d| d.name == "helper"));
     }
-} 
+}

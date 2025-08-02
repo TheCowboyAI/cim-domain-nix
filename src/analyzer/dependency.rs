@@ -117,13 +117,13 @@ impl DependencyAnalyzer {
         for child in inputs_node.children() {
             let text = child.text().to_string();
             let trimmed = text.trim();
-            
+
             // Check if this looks like an attribute assignment
             if trimmed.contains('=') && !trimmed.starts_with('#') {
                 // Extract the key part
                 if let Some(key_part) = trimmed.split('=').next() {
                     let _input_name = key_part.trim().to_string();
-                    
+
                     // Try to extract URL from the value
                     // Look for string nodes in children
                     for value_child in child.children() {
@@ -253,14 +253,14 @@ impl DependencyAnalyzer {
         for child in node.children() {
             let text = child.text().to_string();
             let trimmed = text.trim();
-            
+
             // Check if this child's text starts with the attribute name
             if trimmed.starts_with(name) && trimmed.contains('=') {
                 // Find the value part after the equals sign
                 for value_child in child.children() {
                     // Skip identifier and look for actual value nodes
                     match value_child.kind() {
-                        SyntaxKind::NODE_STRING 
+                        SyntaxKind::NODE_STRING
                         | SyntaxKind::NODE_ATTR_SET
                         | SyntaxKind::NODE_LIST
                         | SyntaxKind::NODE_PATH => {
@@ -270,7 +270,7 @@ impl DependencyAnalyzer {
                     }
                 }
             }
-            
+
             // Recurse into attribute sets
             if child.kind() == SyntaxKind::NODE_ATTR_SET {
                 if let Some(found) = Self::find_attribute(&child, name) {
@@ -342,9 +342,7 @@ impl DependencyAnalyzer {
 
         for scc in sccs {
             if scc.len() > 1 {
-                let cycle: Vec<PathBuf> = scc.iter()
-                    .map(|&idx| graph[idx].path.clone())
-                    .collect();
+                let cycle: Vec<PathBuf> = scc.iter().map(|&idx| graph[idx].path.clone()).collect();
                 cycles.push(cycle);
             }
         }
@@ -355,9 +353,7 @@ impl DependencyAnalyzer {
     /// Find missing dependencies (referenced but not found)
     fn find_missing_dependencies(graph: &DependencyGraph) -> Vec<PathBuf> {
         let mut missing = Vec::new();
-        let existing_paths: HashSet<_> = graph.node_indices()
-            .map(|idx| &graph[idx].path)
-            .collect();
+        let existing_paths: HashSet<_> = graph.node_indices().map(|idx| &graph[idx].path).collect();
 
         for edge in graph.edge_references() {
             let dep = edge.weight();
@@ -381,11 +377,12 @@ impl DependencyAnalyzer {
             let mut max_depth = 0;
 
             for node in sorted {
-                let depth = graph.edges_directed(node, petgraph::Direction::Incoming)
+                let depth = graph
+                    .edges_directed(node, petgraph::Direction::Incoming)
                     .map(|edge| depths.get(&edge.source()).copied().unwrap_or(0) + 1)
                     .max()
                     .unwrap_or(0);
-                
+
                 depths.insert(node, depth);
                 max_depth = max_depth.max(depth);
             }
@@ -399,9 +396,13 @@ impl DependencyAnalyzer {
 
     /// Find files that are not dependencies of anything
     fn find_unused_files(graph: &DependencyGraph) -> Vec<PathBuf> {
-        graph.node_indices()
+        graph
+            .node_indices()
             .filter(|&idx| {
-                graph.edges_directed(idx, petgraph::Direction::Incoming).count() == 0
+                graph
+                    .edges_directed(idx, petgraph::Direction::Incoming)
+                    .count()
+                    == 0
             })
             .map(|idx| graph[idx].path.clone())
             .collect()
@@ -438,8 +439,12 @@ mod tests {
         let deps = DependencyAnalyzer::find_dependencies(&file).unwrap();
 
         assert!(deps.len() >= 3);
-        assert!(deps.iter().any(|d| d.path == PathBuf::from("./hardware.nix")));
-        assert!(deps.iter().any(|d| d.path == PathBuf::from("./network.nix")));
+        assert!(deps
+            .iter()
+            .any(|d| d.path == PathBuf::from("./hardware.nix")));
+        assert!(deps
+            .iter()
+            .any(|d| d.path == PathBuf::from("./network.nix")));
         assert!(deps.iter().any(|d| d.path == PathBuf::from("./config.nix")));
     }
 
@@ -459,10 +464,11 @@ mod tests {
         let file = NixFile::parse_string(content.to_string(), None).unwrap();
         let deps = DependencyAnalyzer::find_dependencies(&file).unwrap();
 
-        let flake_inputs: Vec<_> = deps.iter()
+        let flake_inputs: Vec<_> = deps
+            .iter()
             .filter(|d| d.dep_type == DependencyType::FlakeInput)
             .collect();
 
         assert_eq!(flake_inputs.len(), 2);
     }
-} 
+}

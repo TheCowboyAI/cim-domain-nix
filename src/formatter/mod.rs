@@ -3,7 +3,7 @@
 //! This module provides integration with various Nix formatting tools
 //! such as nixpkgs-fmt, alejandra, and nixfmt.
 
-use crate::{Result, NixDomainError};
+use crate::{NixDomainError, Result};
 use std::path::Path;
 use std::process::Command;
 use tokio::process::Command as AsyncCommand;
@@ -111,7 +111,7 @@ impl FormatterService {
     /// Format a single file
     pub async fn format_file(&self, path: &Path) -> Result<FormattingResult> {
         let mut cmd = AsyncCommand::new(self.formatter.command());
-        
+
         // Add formatter-specific args
         for arg in self.formatter.args() {
             cmd.arg(arg);
@@ -128,7 +128,9 @@ impl FormatterService {
 
         cmd.arg(path);
 
-        let output = cmd.output().await
+        let output = cmd
+            .output()
+            .await
             .map_err(|e| NixDomainError::FormatterError(format!("Failed to run formatter: {e}")))?;
 
         Ok(FormattingResult {
@@ -161,7 +163,7 @@ impl FormatterService {
     /// Format all Nix files in a directory
     pub async fn format_directory(&self, dir: &Path) -> Result<FormattingReport> {
         let mut report = FormattingReport::default();
-        
+
         // Find all .nix files
         let nix_files = self.find_nix_files(dir).await?;
         report.total_files = nix_files.len();
@@ -174,13 +176,15 @@ impl FormatterService {
                     } else if result.needs_formatting {
                         report.needs_formatting.push(file.display().to_string());
                     }
-                    
+
                     if let Some(error) = result.error {
                         report.errors.push((file.display().to_string(), error));
                     }
                 }
                 Err(e) => {
-                    report.errors.push((file.display().to_string(), e.to_string()));
+                    report
+                        .errors
+                        .push((file.display().to_string(), e.to_string()));
                 }
             }
         }
@@ -196,21 +200,22 @@ impl FormatterService {
         let mut dirs_to_visit = vec![dir.to_path_buf()];
 
         while let Some(current_dir) = dirs_to_visit.pop() {
-            let mut entries = fs::read_dir(&current_dir).await
+            let mut entries = fs::read_dir(&current_dir)
+                .await
                 .map_err(NixDomainError::IoError)?;
 
-            while let Some(entry) = entries.next_entry().await
-                .map_err(NixDomainError::IoError)? {
+            while let Some(entry) = entries
+                .next_entry()
+                .await
+                .map_err(NixDomainError::IoError)?
+            {
                 let path = entry.path();
-                let file_type = entry.file_type().await
-                    .map_err(NixDomainError::IoError)?;
+                let file_type = entry.file_type().await.map_err(NixDomainError::IoError)?;
 
                 if file_type.is_dir() {
                     // Skip hidden directories and common build outputs
-                    let file_name = path.file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("");
-                    
+                    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
                     if !file_name.starts_with('.') && file_name != "result" {
                         dirs_to_visit.push(path);
                     }
@@ -263,12 +268,14 @@ impl FormattingReport {
         if self.needs_formatting.is_empty() && self.errors.is_empty() {
             format!("✅ All {} files are properly formatted", self.total_files)
         } else if !self.formatted_files.is_empty() {
-            format!("Formatted {} files, {} errors",
+            format!(
+                "Formatted {} files, {} errors",
                 self.formatted_files.len(),
                 self.errors.len()
             )
         } else {
-            format!("❌ {} files need formatting, {} errors",
+            format!(
+                "❌ {} files need formatting, {} errors",
                 self.needs_formatting.len(),
                 self.errors.len()
             )
@@ -293,15 +300,17 @@ mod tests {
     async fn test_format_file() {
         let temp_dir = TempDir::new().unwrap();
         let test_file = temp_dir.path().join("test.nix");
-        
+
         // Write unformatted Nix code
-        fs::write(&test_file, "{ foo = \"bar\"; baz = 42; }").await.unwrap();
+        fs::write(&test_file, "{ foo = \"bar\"; baz = 42; }")
+            .await
+            .unwrap();
 
         // Skip test if no formatter is available
         if let Some(formatter) = NixFormatter::detect_from_project(temp_dir.path()).await {
             let service = FormatterService::new(formatter);
             let result = service.format_file(&test_file).await;
-            
+
             // We can't guarantee the formatter is installed in test environment
             if result.is_ok() {
                 let result = result.unwrap();
@@ -309,4 +318,4 @@ mod tests {
             }
         }
     }
-} 
+}

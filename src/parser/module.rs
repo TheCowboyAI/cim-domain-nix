@@ -50,13 +50,13 @@ impl ModuleParser {
     pub fn parse(file: &NixFile) -> Result<ParsedModule> {
         // Convert to our AST representation
         let ast = file.to_ast()?;
-        
+
         // Extract module components
         let mut imports = Vec::new();
         let mut options = HashMap::new();
         let mut config = HashMap::new();
         let mut meta = ModuleMeta::default();
-        
+
         // A module can be either:
         // 1. A function that takes arguments and returns an attribute set
         // 2. An attribute set directly
@@ -67,15 +67,21 @@ impl ModuleParser {
             }
             super::ast::NixAst::AttrSet { bindings, .. } => {
                 // Module is directly an attribute set
-                Self::extract_from_bindings(bindings, &mut imports, &mut options, &mut config, &mut meta)?;
+                Self::extract_from_bindings(
+                    bindings,
+                    &mut imports,
+                    &mut options,
+                    &mut config,
+                    &mut meta,
+                )?;
             }
             _ => {
                 return Err(crate::NixDomainError::ParseError(
-                    "Module must be either a function or an attribute set".to_string()
+                    "Module must be either a function or an attribute set".to_string(),
                 ));
             }
         }
-        
+
         Ok(ParsedModule {
             file: file.clone(),
             imports,
@@ -84,7 +90,7 @@ impl ModuleParser {
             meta,
         })
     }
-    
+
     /// Extract module components from an AST node
     fn extract_from_ast(
         ast: &super::ast::NixAst,
@@ -99,13 +105,13 @@ impl ModuleParser {
             }
             _ => {
                 return Err(crate::NixDomainError::ParseError(
-                    "Module body must be an attribute set".to_string()
+                    "Module body must be an attribute set".to_string(),
                 ));
             }
         }
         Ok(())
     }
-    
+
     /// Extract module components from attribute set bindings
     fn extract_from_bindings(
         bindings: &[super::ast::Binding],
@@ -115,7 +121,7 @@ impl ModuleParser {
         meta: &mut ModuleMeta,
     ) -> Result<()> {
         use super::ast::{AttrPathSegment, BindingValue};
-        
+
         for binding in bindings {
             if let Some(AttrPathSegment::Identifier(key)) = binding.attr_path.segments.first() {
                 match key.as_str() {
@@ -149,10 +155,10 @@ impl ModuleParser {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Extract imports from an AST node
     fn extract_imports(ast: &super::ast::NixAst, imports: &mut Vec<PathBuf>) -> Result<()> {
         match ast {
@@ -173,13 +179,13 @@ impl ModuleParser {
             }
             _ => {
                 return Err(crate::NixDomainError::ParseError(
-                    "imports must be a list".to_string()
+                    "imports must be a list".to_string(),
                 ));
             }
         }
         Ok(())
     }
-    
+
     /// Extract options from an AST node
     fn extract_options(
         ast: &super::ast::NixAst,
@@ -188,9 +194,12 @@ impl ModuleParser {
         match ast {
             super::ast::NixAst::AttrSet { bindings, .. } => {
                 use super::ast::{AttrPathSegment, BindingValue};
-                
+
                 for binding in bindings {
-                    let option_path = binding.attr_path.segments.iter()
+                    let option_path = binding
+                        .attr_path
+                        .segments
+                        .iter()
                         .filter_map(|seg| {
                             if let AttrPathSegment::Identifier(name) = seg {
                                 Some(name.as_str())
@@ -200,7 +209,7 @@ impl ModuleParser {
                         })
                         .collect::<Vec<_>>()
                         .join(".");
-                    
+
                     if let BindingValue::Value(value) = &binding.value {
                         let option_def = Self::extract_option_definition(value)?;
                         options.insert(option_path, option_def);
@@ -209,23 +218,23 @@ impl ModuleParser {
             }
             _ => {
                 return Err(crate::NixDomainError::ParseError(
-                    "options must be an attribute set".to_string()
+                    "options must be an attribute set".to_string(),
                 ));
             }
         }
         Ok(())
     }
-    
+
     /// Extract option definition from an AST node
     fn extract_option_definition(ast: &super::ast::NixAst) -> Result<OptionDefinition> {
         let mut option_type = String::from("any");
         let mut default = None;
         let mut description = None;
         let mut example = None;
-        
+
         if let super::ast::NixAst::AttrSet { bindings, .. } = ast {
             use super::ast::{AttrPathSegment, BindingValue};
-            
+
             for binding in bindings {
                 if let Some(AttrPathSegment::Identifier(key)) = binding.attr_path.segments.first() {
                     if let BindingValue::Value(value) = &binding.value {
@@ -250,7 +259,7 @@ impl ModuleParser {
                 }
             }
         }
-        
+
         Ok(OptionDefinition {
             option_type,
             default,
@@ -258,14 +267,18 @@ impl ModuleParser {
             example,
         })
     }
-    
+
     /// Extract type name from a type expression
     fn extract_type_name(ast: &super::ast::NixAst) -> Result<String> {
         match ast {
             super::ast::NixAst::Identifier(name) => Ok(name.clone()),
-            super::ast::NixAst::Select { expr, attr_path, .. } => {
+            super::ast::NixAst::Select {
+                expr: _, attr_path, ..
+            } => {
                 // Handle types like `types.str` or `lib.types.int`
-                let path_parts: Vec<String> = attr_path.segments.iter()
+                let path_parts: Vec<String> = attr_path
+                    .segments
+                    .iter()
                     .filter_map(|seg| {
                         if let super::ast::AttrPathSegment::Identifier(name) = seg {
                             Some(name.clone())
@@ -274,7 +287,7 @@ impl ModuleParser {
                         }
                     })
                     .collect();
-                
+
                 if let Some(last) = path_parts.last() {
                     Ok(last.clone())
                 } else {
@@ -284,7 +297,7 @@ impl ModuleParser {
             _ => Ok("any".to_string()),
         }
     }
-    
+
     /// Extract config from an AST node
     fn extract_config(
         ast: &super::ast::NixAst,
@@ -293,9 +306,12 @@ impl ModuleParser {
         match ast {
             super::ast::NixAst::AttrSet { bindings, .. } => {
                 use super::ast::{AttrPathSegment, BindingValue};
-                
+
                 for binding in bindings {
-                    let config_path = binding.attr_path.segments.iter()
+                    let config_path = binding
+                        .attr_path
+                        .segments
+                        .iter()
                         .filter_map(|seg| {
                             if let AttrPathSegment::Identifier(name) = seg {
                                 Some(name.as_str())
@@ -305,7 +321,7 @@ impl ModuleParser {
                         })
                         .collect::<Vec<_>>()
                         .join(".");
-                    
+
                     if let BindingValue::Value(value) = &binding.value {
                         let json_value = Self::ast_to_json(value)?;
                         config.insert(config_path, json_value);
@@ -314,18 +330,18 @@ impl ModuleParser {
             }
             _ => {
                 return Err(crate::NixDomainError::ParseError(
-                    "config must be an attribute set".to_string()
+                    "config must be an attribute set".to_string(),
                 ));
             }
         }
         Ok(())
     }
-    
+
     /// Extract meta information from an AST node
     fn extract_meta(ast: &super::ast::NixAst, meta: &mut ModuleMeta) -> Result<()> {
         if let super::ast::NixAst::AttrSet { bindings, .. } = ast {
             use super::ast::{AttrPathSegment, BindingValue};
-            
+
             for binding in bindings {
                 if let Some(AttrPathSegment::Identifier(key)) = binding.attr_path.segments.first() {
                     if let BindingValue::Value(value) = &binding.value {
@@ -337,7 +353,8 @@ impl ModuleParser {
                             }
                             "maintainers" => {
                                 if let super::ast::NixAst::List(items) = value {
-                                    meta.maintainers = items.iter()
+                                    meta.maintainers = items
+                                        .iter()
                                         .filter_map(|item| {
                                             if let super::ast::NixAst::String(s) = item {
                                                 Some(s.clone())
@@ -356,11 +373,11 @@ impl ModuleParser {
         }
         Ok(())
     }
-    
+
     /// Convert an AST node to JSON
     fn ast_to_json(ast: &super::ast::NixAst) -> Result<serde_json::Value> {
         use super::ast::NixAst;
-        
+
         Ok(match ast {
             NixAst::Integer(i) => serde_json::json!(i),
             NixAst::Float(f) => serde_json::json!(f),
@@ -369,17 +386,18 @@ impl ModuleParser {
             NixAst::Null => serde_json::Value::Null,
             NixAst::Path(p) => serde_json::json!(p.to_string_lossy()),
             NixAst::List(items) => {
-                let json_items: Result<Vec<_>> = items.iter()
-                    .map(|item| Self::ast_to_json(item))
-                    .collect();
+                let json_items: Result<Vec<_>> =
+                    items.iter().map(|item| Self::ast_to_json(item)).collect();
                 serde_json::json!(json_items?)
             }
             NixAst::AttrSet { bindings, .. } => {
                 use super::ast::{AttrPathSegment, BindingValue};
-                
+
                 let mut map = serde_json::Map::new();
                 for binding in bindings {
-                    if let Some(AttrPathSegment::Identifier(key)) = binding.attr_path.segments.first() {
+                    if let Some(AttrPathSegment::Identifier(key)) =
+                        binding.attr_path.segments.first()
+                    {
                         if let BindingValue::Value(value) = &binding.value {
                             let json_value = Self::ast_to_json(value)?;
                             map.insert(key.clone(), json_value);
@@ -392,4 +410,4 @@ impl ModuleParser {
             _ => serde_json::json!(format!("{:?}", ast)),
         })
     }
-} 
+}

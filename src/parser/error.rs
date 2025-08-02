@@ -81,4 +81,4 @@ pub struct Position {
     pub column: usize,
     /// The byte offset in the file
     pub offset: usize,
-} 
+}

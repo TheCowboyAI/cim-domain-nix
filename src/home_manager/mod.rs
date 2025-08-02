@@ -1,16 +1,15 @@
 //! Home Manager configuration support
 
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::collections::HashMap;
 use crate::value_objects::NixValue;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 pub mod analyzer;
-pub mod program_converter;
 pub mod converter;
+pub mod program_converter;
 
 /// Represents a Home Manager configuration
-
 pub use analyzer::HomeManagerAnalyzer;
 pub use program_converter::ProgramConverter;
 
@@ -249,11 +248,11 @@ mod tests {
     #[test]
     fn test_home_configuration() {
         let mut config = HomeConfiguration::new();
-        
+
         let git_config = ProgramConfig::new(true);
         config.add_program("git".to_string(), git_config);
-        
+
         assert_eq!(config.programs.len(), 1);
         assert!(config.programs.get("git").unwrap().is_enabled());
     }
-} 
+}

@@ -7,19 +7,19 @@ use serde::{Deserialize, Serialize};
 pub struct NatsConfig {
     /// NATS server URL
     pub url: String,
-    
+
     /// Subject prefix for this domain
     pub subject_prefix: String,
-    
+
     /// Authentication configuration
     pub auth: Option<NatsAuth>,
-    
+
     /// TLS configuration
     pub tls: Option<NatsTls>,
-    
+
     /// Connection retry configuration
     pub retry: RetryConfig,
-    
+
     /// Service identification
     pub service: ServiceConfig,
 }
@@ -30,13 +30,13 @@ pub struct NatsAuth {
     /// Username/password authentication
     pub username: Option<String>,
     pub password: Option<String>,
-    
+
     /// Token authentication
     pub token: Option<String>,
-    
+
     /// NKey authentication
     pub nkey: Option<String>,
-    
+
     /// JWT authentication
     pub jwt: Option<String>,
 }
@@ -46,13 +46,13 @@ pub struct NatsAuth {
 pub struct NatsTls {
     /// Path to CA certificate
     pub ca_cert: Option<String>,
-    
+
     /// Path to client certificate
     pub client_cert: Option<String>,
-    
+
     /// Path to client key
     pub client_key: Option<String>,
-    
+
     /// Skip server certificate verification (dangerous!)
     pub insecure_skip_verify: bool,
 }
@@ -62,16 +62,16 @@ pub struct NatsTls {
 pub struct RetryConfig {
     /// Maximum number of reconnect attempts
     pub max_reconnects: usize,
-    
+
     /// Initial reconnect delay in milliseconds
     pub reconnect_delay_ms: u64,
-    
+
     /// Maximum reconnect delay in milliseconds
     pub max_reconnect_delay_ms: u64,
-    
+
     /// Reconnect time jitter in milliseconds
     pub reconnect_jitter_ms: u64,
-    
+
     /// Connect timeout in milliseconds
     pub connect_timeout_ms: u64,
 }
@@ -81,13 +81,13 @@ pub struct RetryConfig {
 pub struct ServiceConfig {
     /// Service name
     pub name: String,
-    
+
     /// Service version
     pub version: String,
-    
+
     /// Service instance ID
     pub instance_id: String,
-    
+
     /// Service description
     pub description: String,
 }
@@ -136,27 +136,27 @@ impl NatsConfig {
             ..Default::default()
         }
     }
-    
+
     /// Set authentication
     pub fn with_auth(mut self, auth: NatsAuth) -> Self {
         self.auth = Some(auth);
         self
     }
-    
+
     /// Set TLS configuration
     pub fn with_tls(mut self, tls: NatsTls) -> Self {
         self.tls = Some(tls);
         self
     }
-    
+
     /// Load configuration from environment variables
     pub fn from_env() -> Self {
         let mut config = Self::default();
-        
+
         if let Ok(url) = std::env::var("NATS_URL") {
             config.url = url;
         }
-        
+
         if let Ok(user) = std::env::var("NATS_USER") {
             let password = std::env::var("NATS_PASSWORD").ok();
             config.auth = Some(NatsAuth {
@@ -175,7 +175,7 @@ impl NatsConfig {
                 jwt: None,
             });
         }
-        
+
         config
     }
 }
@@ -183,7 +183,7 @@ impl NatsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_default_config() {
         let config = NatsConfig::default();
@@ -192,18 +192,17 @@ mod tests {
         assert!(config.auth.is_none());
         assert!(config.tls.is_none());
     }
-    
+
     #[test]
     fn test_config_builder() {
-        let config = NatsConfig::new("nats://remote:4222")
-            .with_auth(NatsAuth {
-                username: Some("user".to_string()),
-                password: Some("pass".to_string()),
-                token: None,
-                nkey: None,
-                jwt: None,
-            });
-        
+        let config = NatsConfig::new("nats://remote:4222").with_auth(NatsAuth {
+            username: Some("user".to_string()),
+            password: Some("pass".to_string()),
+            token: None,
+            nkey: None,
+            jwt: None,
+        });
+
         assert_eq!(config.url, "nats://remote:4222");
         assert!(config.auth.is_some());
     }

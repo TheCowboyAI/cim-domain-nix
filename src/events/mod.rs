@@ -6,32 +6,38 @@
 mod factory;
 pub use factory::NixEventFactory;
 
-use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration, StorePath, MessageIdentity, CorrelationId, CausationId};
+use crate::value_objects::{
+    AttributePath, CausationId, CorrelationId, MessageIdentity, NixModule, NixOSConfiguration,
+    Overlay, StorePath,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use std::path::PathBuf;
 use std::any::Any;
+use std::path::PathBuf;
+use uuid::Uuid;
 
 /// Base trait for all Nix domain events
 pub trait NixDomainEvent: Send + Sync + std::fmt::Debug {
     /// Gets the event ID
     fn event_id(&self) -> Uuid;
-    
+
     /// Gets the timestamp when the event occurred
     fn occurred_at(&self) -> DateTime<Utc>;
-    
+
     /// Gets the aggregate ID this event belongs to
     fn aggregate_id(&self) -> Uuid;
-    
+
     /// Gets the correlation ID for this event
     fn correlation_id(&self) -> CorrelationId;
-    
+
     /// Gets the causation ID for this event
     fn causation_id(&self) -> CausationId;
-    
+
     /// Get the event as Any for downcasting
     fn as_any(&self) -> &dyn Any;
+
+    /// Get the event type name
+    fn event_type(&self) -> &'static str;
 }
 
 /// Event emitted when a flake is created
@@ -55,25 +61,29 @@ impl NixDomainEvent for FlakeCreated {
     fn event_id(&self) -> Uuid {
         self.flake_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.timestamp
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.flake_id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "FlakeCreated"
     }
 }
 
@@ -94,25 +104,29 @@ impl NixDomainEvent for FlakeUpdated {
     fn event_id(&self) -> Uuid {
         self.flake_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.timestamp
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.flake_id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "FlakeUpdated"
     }
 }
 
@@ -137,25 +151,29 @@ impl NixDomainEvent for FlakeInputAdded {
     fn event_id(&self) -> Uuid {
         self.flake_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.timestamp
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.flake_id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "FlakeInputAdded"
     }
 }
 
@@ -182,25 +200,29 @@ impl NixDomainEvent for PackageBuilt {
     fn event_id(&self) -> Uuid {
         self.package_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.timestamp
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.package_id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "PackageBuilt"
     }
 }
 
@@ -221,25 +243,29 @@ impl NixDomainEvent for ModuleCreated {
     fn event_id(&self) -> Uuid {
         self.event_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_at
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.module.id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "ModuleCreated"
     }
 }
 
@@ -260,25 +286,29 @@ impl NixDomainEvent for OverlayCreated {
     fn event_id(&self) -> Uuid {
         self.event_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_at
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.overlay.id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "OverlayCreated"
     }
 }
 
@@ -299,25 +329,29 @@ impl NixDomainEvent for ConfigurationCreated {
     fn event_id(&self) -> Uuid {
         self.event_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_at
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.configuration.id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "ConfigurationCreated"
     }
 }
 
@@ -353,25 +387,29 @@ impl NixDomainEvent for ConfigurationActivated {
     fn event_id(&self) -> Uuid {
         self.event_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_at
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.configuration_id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "ConfigurationActivated"
     }
 }
 
@@ -394,25 +432,29 @@ impl NixDomainEvent for ExpressionEvaluated {
     fn event_id(&self) -> Uuid {
         self.expression_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.timestamp
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.expression_id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn event_type(&self) -> &'static str {
+        "ExpressionEvaluated"
     }
 }
 
@@ -435,24 +477,28 @@ impl NixDomainEvent for GarbageCollected {
     fn event_id(&self) -> Uuid {
         self.collection_id
     }
-    
+
     fn occurred_at(&self) -> DateTime<Utc> {
         self.timestamp
     }
-    
+
     fn aggregate_id(&self) -> Uuid {
         self.collection_id
     }
-    
+
     fn correlation_id(&self) -> CorrelationId {
         self.identity.correlation_id
     }
-    
+
     fn causation_id(&self) -> CausationId {
         self.identity.causation_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-} 
+
+    fn event_type(&self) -> &'static str {
+        "GarbageCollected"
+    }
+}

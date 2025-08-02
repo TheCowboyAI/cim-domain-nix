@@ -77,7 +77,8 @@ impl SecurityAnalyzer {
 
         // Sort by severity (highest first) then by file
         issues.sort_by(|a, b| {
-            b.severity.cmp(&a.severity)
+            b.severity
+                .cmp(&a.severity)
                 .then_with(|| a.file.cmp(&b.file))
         });
 
@@ -93,7 +94,10 @@ impl SecurityAnalyzer {
         issues.extend(Self::check_impure_functions(&file.ast, &file.source)?);
         issues.extend(Self::check_unsafe_derivations(&file.ast, &file.source)?);
         issues.extend(Self::check_fixed_output_hashes(&file.ast, &file.source)?);
-        issues.extend(Self::check_arbitrary_code_execution(&file.ast, &file.source)?);
+        issues.extend(Self::check_arbitrary_code_execution(
+            &file.ast,
+            &file.source,
+        )?);
         issues.extend(Self::check_network_security(&file.ast, &file.source)?);
 
         Ok(issues)
@@ -109,7 +113,7 @@ impl SecurityAnalyzer {
         // Look for fetch* functions
         if node.kind() == SyntaxKind::NODE_APPLY {
             let text = node.text().to_string();
-            
+
             // Check various fetchers
             let fetchers = [
                 "fetchurl",
@@ -124,16 +128,20 @@ impl SecurityAnalyzer {
                 if text.contains(fetcher) {
                     // Check if it has a hash argument
                     let has_hash = Self::has_hash_argument(node);
-                    
+
                     if !has_hash {
                         issues.push(SecurityIssue {
                             issue_type: SecurityIssueType::InsecureFetcher,
                             severity: Severity::High,
-                            description: format!("Using {fetcher} without a hash allows arbitrary code changes"),
+                            description: format!(
+                                "Using {fetcher} without a hash allows arbitrary code changes"
+                            ),
                             file: file.as_ref().map(|p| p.display().to_string()),
                             line: None, // TODO: Extract line info
                             column: None,
-                            suggestion: Some(format!("Add a sha256 or hash attribute to the {fetcher} call")),
+                            suggestion: Some(format!(
+                                "Add a sha256 or hash attribute to the {fetcher} call"
+                            )),
                         });
                     }
                 }
@@ -156,15 +164,24 @@ impl SecurityAnalyzer {
         let mut issues = Vec::new();
 
         let text = node.text().to_string();
-        
+
         // List of impure functions
         let impure_functions = [
-            ("builtins.currentTime", "Returns non-deterministic current time"),
+            (
+                "builtins.currentTime",
+                "Returns non-deterministic current time",
+            ),
             ("builtins.currentSystem", "Returns system-dependent value"),
             ("builtins.getEnv", "Reads from environment variables"),
             ("builtins.readFile", "Reads files at evaluation time"),
-            ("builtins.readDir", "Reads directory contents at evaluation time"),
-            ("builtins.fetchurl", "Fetches from network without sandboxing"),
+            (
+                "builtins.readDir",
+                "Reads directory contents at evaluation time",
+            ),
+            (
+                "builtins.fetchurl",
+                "Fetches from network without sandboxing",
+            ),
         ];
 
         for (func, desc) in &impure_functions {
@@ -176,7 +193,10 @@ impl SecurityAnalyzer {
                     file: file.as_ref().map(|p| p.display().to_string()),
                     line: None,
                     column: None,
-                    suggestion: Some("Consider using pure alternatives or making the evaluation deterministic".to_string()),
+                    suggestion: Some(
+                        "Consider using pure alternatives or making the evaluation deterministic"
+                            .to_string(),
+                    ),
                 });
             }
         }
@@ -207,7 +227,9 @@ impl SecurityAnalyzer {
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 column: None,
-                suggestion: Some("Only allow unfree packages that are explicitly needed".to_string()),
+                suggestion: Some(
+                    "Only allow unfree packages that are explicitly needed".to_string(),
+                ),
             });
         }
 
@@ -220,7 +242,9 @@ impl SecurityAnalyzer {
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 column: None,
-                suggestion: Some("Update to secure versions or explicitly accept the risk".to_string()),
+                suggestion: Some(
+                    "Update to secure versions or explicitly accept the risk".to_string(),
+                ),
             });
         }
 
@@ -229,7 +253,8 @@ impl SecurityAnalyzer {
             issues.push(SecurityIssue {
                 issue_type: SecurityIssueType::ArbitraryCodeExecution,
                 severity: Severity::Critical,
-                description: "Disabling sandbox allows builds to access the network and filesystem".to_string(),
+                description: "Disabling sandbox allows builds to access the network and filesystem"
+                    .to_string(),
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 column: None,
@@ -315,11 +340,14 @@ impl SecurityAnalyzer {
             issues.push(SecurityIssue {
                 issue_type: SecurityIssueType::ArbitraryCodeExecution,
                 severity: Severity::Medium,
-                description: "Import from derivation (IFD) can execute code during evaluation".to_string(),
+                description: "Import from derivation (IFD) can execute code during evaluation"
+                    .to_string(),
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 column: None,
-                suggestion: Some("Consider alternatives to IFD for better security and performance".to_string()),
+                suggestion: Some(
+                    "Consider alternatives to IFD for better security and performance".to_string(),
+                ),
             });
         }
 
@@ -341,11 +369,15 @@ impl SecurityAnalyzer {
         let text = node.text().to_string();
 
         // Check for HTTP URLs (not HTTPS)
-        if text.contains("http://") && !text.contains("http://localhost") && !text.contains("http://127.0.0.1") {
+        if text.contains("http://")
+            && !text.contains("http://localhost")
+            && !text.contains("http://127.0.0.1")
+        {
             issues.push(SecurityIssue {
                 issue_type: SecurityIssueType::InsecureNetworkAccess,
                 severity: Severity::Medium,
-                description: "Using HTTP instead of HTTPS allows man-in-the-middle attacks".to_string(),
+                description: "Using HTTP instead of HTTPS allows man-in-the-middle attacks"
+                    .to_string(),
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 column: None,
@@ -377,12 +409,12 @@ impl SecurityAnalyzer {
     /// Check if a fetch call has a hash argument
     fn has_hash_argument(node: &SyntaxNode) -> bool {
         let text = node.text().to_string();
-        
+
         // Look for hash-related attributes
-        text.contains("sha256") || 
-        text.contains("sha512") || 
-        text.contains("hash =") ||
-        text.contains("outputHash")
+        text.contains("sha256")
+            || text.contains("sha512")
+            || text.contains("hash =")
+            || text.contains("outputHash")
     }
 }
 
@@ -422,7 +454,8 @@ mod tests {
         let file = NixFile::parse_string(content.to_string(), None).unwrap();
         let issues = SecurityAnalyzer::analyze(&[file]).unwrap();
 
-        let weak_hash_issues: Vec<_> = issues.iter()
+        let weak_hash_issues: Vec<_> = issues
+            .iter()
             .filter(|i| i.issue_type == SecurityIssueType::WeakHash)
             .collect();
 
@@ -445,10 +478,11 @@ mod tests {
         let issues = SecurityAnalyzer::analyze(&[file]).unwrap();
 
         // Should not have insecure fetcher issues
-        let fetcher_issues: Vec<_> = issues.iter()
+        let fetcher_issues: Vec<_> = issues
+            .iter()
             .filter(|i| i.issue_type == SecurityIssueType::InsecureFetcher)
             .collect();
 
         assert!(fetcher_issues.is_empty());
     }
-} 
+}

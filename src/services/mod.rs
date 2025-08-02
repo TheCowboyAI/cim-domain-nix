@@ -1,17 +1,26 @@
 //! Domain services for Nix operations
 
-use crate::commands::{CreateFlake, AddFlakeInput};
-use crate::{Result, NixDomainError};
-use std::path::PathBuf;
-use uuid::Uuid;
+use crate::commands::{AddFlakeInput, CreateFlake};
 use crate::{
-    commands::{BuildPackage, RunGarbageCollection, CreateConfiguration, ActivateConfiguration, CheckFlake, DevelopFlake},
-    events::{FlakeCreated, PackageBuilt, ActivationType, ConfigurationActivated, GarbageCollected},
+    commands::{
+        ActivateConfiguration, BuildPackage, CheckFlake, CreateConfiguration, DevelopFlake,
+        RunGarbageCollection,
+    },
+    events::{
+        ActivationType, ConfigurationActivated, FlakeCreated, GarbageCollected, PackageBuilt,
+    },
     handlers::NixCommandHandler,
     projections::NixProjection,
-    queries::{FindFlakeQuery, FindPackageQuery, SearchNixPackagesQuery, FindConfigurationQuery, NixQueryHandler, AdvancedNixQueryHandler, FlakeView, PackageView, ConfigurationView, PackageSearchResult},
-    value_objects::{AttributePath, NixOSConfiguration},
+    queries::{
+        AdvancedNixQueryHandler, ConfigurationView, FindConfigurationQuery, FindFlakeQuery,
+        FindPackageQuery, FlakeView, NixQueryHandler, PackageSearchResult, PackageView,
+        SearchNixPackagesQuery,
+    },
+    value_objects::{AttributePath, MessageIdentity, NixOSConfiguration},
 };
+use crate::{NixDomainError, Result};
+use std::path::PathBuf;
+use uuid::Uuid;
 
 /// Service for managing Nix development environments
 pub struct NixDevelopmentService {
@@ -21,7 +30,8 @@ pub struct NixDevelopmentService {
 
 impl NixDevelopmentService {
     /// Create a new development service
-    #[must_use] pub fn new(projection: NixProjection) -> Self {
+    #[must_use]
+    pub fn new(projection: NixProjection) -> Self {
         Self {
             command_handler: NixCommandHandler::new(),
             query_handler: NixQueryHandler::new(projection),
@@ -37,19 +47,23 @@ impl NixDevelopmentService {
     ) -> Result<Uuid> {
         // Create flake with template
         let create_cmd = CreateFlake {
+            identity: MessageIdentity::new_root(),
             path: path.clone(),
             description,
             template: Some(project_type.to_string()),
         };
 
-        let events = self.command_handler
+        let events = self
+            .command_handler
             .handle_command(Box::new(create_cmd))
             .await?;
 
         // Extract flake ID from events
-        let flake_id = events.iter()
+        let flake_id = events
+            .iter()
             .find_map(|e| {
-                e.as_any().downcast_ref::<FlakeCreated>().map(|created| created.flake_id)
+                e.downcast_ref::<FlakeCreated>()
+                    .map(|created| created.flake_id)
             })
             .ok_or_else(|| NixDomainError::Other("No FlakeCreated event found".to_string()))?;
 
@@ -67,14 +81,13 @@ impl NixDevelopmentService {
         dep_url: String,
     ) -> Result<()> {
         let cmd = AddFlakeInput {
+            identity: MessageIdentity::new_root(),
             path: flake_path,
             name: dep_name,
             url: dep_url,
         };
 
-        self.command_handler
-            .handle_command(Box::new(cmd))
-            .await?;
+        self.command_handler.handle_command(Box::new(cmd)).await?;
 
         Ok(())
     }
@@ -83,6 +96,7 @@ impl NixDevelopmentService {
     pub async fn build_and_test(&self, flake_path: PathBuf) -> Result<BuildReport> {
         // Check flake first
         let check_cmd = CheckFlake {
+            identity: MessageIdentity::new_root(),
             path: flake_path.clone(),
         };
 
@@ -92,18 +106,21 @@ impl NixDevelopmentService {
 
         // Build default package
         let build_cmd = BuildPackage {
+            identity: MessageIdentity::new_root(),
             flake_ref: format!("path:{}", flake_path.display()),
             attribute: AttributePath::from_str("defaultPackage"),
             output_path: Some(flake_path.join("result")),
         };
 
-        let build_events = self.command_handler
+        let build_events = self
+            .command_handler
             .handle_command(Box::new(build_cmd))
             .await?;
 
         // Extract build results
-        let build_success = build_events.iter()
-            .any(|e| e.as_any().downcast_ref::<PackageBuilt>().is_some());
+        let build_success = build_events
+            .iter()
+            .any(|e| e.downcast_ref::<PackageBuilt>().is_some());
 
         Ok(BuildReport {
             success: build_success,
@@ -119,13 +136,12 @@ impl NixDevelopmentService {
         command: Option<String>,
     ) -> Result<()> {
         let cmd = DevelopFlake {
+            identity: MessageIdentity::new_root(),
             path: flake_path,
             command,
         };
 
-        self.command_handler
-            .handle_command(Box::new(cmd))
-            .await?;
+        self.command_handler.handle_command(Box::new(cmd)).await?;
 
         Ok(())
     }
@@ -136,8 +152,13 @@ impl NixDevelopmentService {
     }
 
     /// Find a package by name
-    pub fn find_package(&self, name: String, system: Option<String>) -> Result<Option<PackageView>> {
-        self.query_handler.find_package(FindPackageQuery { name, system })
+    pub fn find_package(
+        &self,
+        name: String,
+        system: Option<String>,
+    ) -> Result<Option<PackageView>> {
+        self.query_handler
+            .find_package(FindPackageQuery { name, system })
     }
 
     async fn init_git_repo(&self, path: &PathBuf) -> Result<()> {
@@ -172,7 +193,8 @@ pub struct NixOSConfigurationService {
 
 impl NixOSConfigurationService {
     /// Create a new configuration service
-    #[must_use] pub fn new(projection: NixProjection) -> Self {
+    #[must_use]
+    pub fn new(projection: NixProjection) -> Self {
         Self {
             command_handler: NixCommandHandler::new(),
             query_handler: NixQueryHandler::new(projection),
@@ -199,13 +221,12 @@ impl NixOSConfigurationService {
         };
 
         let cmd = CreateConfiguration {
+            identity: MessageIdentity::new_root(),
             name,
             configuration: config.clone(),
         };
 
-        self.command_handler
-            .handle_command(Box::new(cmd))
-            .await?;
+        self.command_handler.handle_command(Box::new(cmd)).await?;
 
         Ok(config.id)
     }
@@ -213,18 +234,19 @@ impl NixOSConfigurationService {
     /// Switch to a configuration
     pub async fn switch_configuration(&self, name: String) -> Result<u32> {
         let cmd = ActivateConfiguration {
+            identity: MessageIdentity::new_root(),
             name,
             activation_type: ActivationType::Switch,
         };
 
-        let events = self.command_handler
-            .handle_command(Box::new(cmd))
-            .await?;
+        let events = self.command_handler.handle_command(Box::new(cmd)).await?;
 
         // Extract generation number
-        let generation = events.iter()
+        let generation = events
+            .iter()
             .find_map(|e| {
-                e.as_any().downcast_ref::<ConfigurationActivated>().map(|activated| activated.generation)
+                e.downcast_ref::<ConfigurationActivated>()
+                    .map(|activated| activated.generation)
             })
             .unwrap_or(0);
 
@@ -233,19 +255,19 @@ impl NixOSConfigurationService {
 
     /// Find a configuration by name
     pub fn find_configuration(&self, name: String) -> Result<Option<ConfigurationView>> {
-        self.query_handler.find_configuration(FindConfigurationQuery { name })
+        self.query_handler
+            .find_configuration(FindConfigurationQuery { name })
     }
 
     /// Test a configuration without switching
     pub async fn test_configuration(&self, name: String) -> Result<()> {
         let cmd = ActivateConfiguration {
+            identity: MessageIdentity::new_root(),
             name,
             activation_type: ActivationType::Test,
         };
 
-        self.command_handler
-            .handle_command(Box::new(cmd))
-            .await?;
+        self.command_handler.handle_command(Box::new(cmd)).await?;
 
         Ok(())
     }
@@ -259,7 +281,8 @@ pub struct NixPackageService {
 
 impl NixPackageService {
     /// Create a new package service
-    #[must_use] pub fn new(projection: NixProjection) -> Self {
+    #[must_use]
+    pub fn new(projection: NixProjection) -> Self {
         Self {
             command_handler: NixCommandHandler::new(),
             query_handler: AdvancedNixQueryHandler::new(projection),
@@ -267,11 +290,12 @@ impl NixPackageService {
     }
 
     /// Search for packages in nixpkgs
-    pub async fn search_packages(&self, query: String, limit: Option<usize>) -> Result<Vec<PackageSearchResult>> {
-        let search_query = SearchNixPackagesQuery {
-            query,
-            limit,
-        };
+    pub async fn search_packages(
+        &self,
+        query: String,
+        limit: Option<usize>,
+    ) -> Result<Vec<PackageSearchResult>> {
+        let search_query = SearchNixPackagesQuery { query, limit };
 
         self.query_handler.search_nixpkgs(search_query).await
     }
@@ -283,19 +307,20 @@ impl NixPackageService {
         output_path: Option<PathBuf>,
     ) -> Result<PathBuf> {
         let cmd = BuildPackage {
+            identity: MessageIdentity::new_root(),
             flake_ref: "nixpkgs".to_string(),
             attribute: AttributePath::from_str(package_name),
             output_path: output_path.clone(),
         };
 
-        let events = self.command_handler
-            .handle_command(Box::new(cmd))
-            .await?;
+        let events = self.command_handler.handle_command(Box::new(cmd)).await?;
 
         // Extract output path
-        let output = events.iter()
+        let output = events
+            .iter()
             .find_map(|e| {
-                e.as_any().downcast_ref::<PackageBuilt>().map(|built| built.output_path.clone())
+                e.downcast_ref::<PackageBuilt>()
+                    .map(|built| built.output_path.clone())
             })
             .unwrap_or_else(|| output_path.unwrap_or_else(|| PathBuf::from("./result")));
 
@@ -305,17 +330,18 @@ impl NixPackageService {
     /// Clean up old packages
     pub async fn garbage_collect(&self, older_than_days: Option<u32>) -> Result<u64> {
         let cmd = RunGarbageCollection {
+            identity: MessageIdentity::new_root(),
             older_than_days,
         };
 
-        let events = self.command_handler
-            .handle_command(Box::new(cmd))
-            .await?;
+        let events = self.command_handler.handle_command(Box::new(cmd)).await?;
 
         // Extract freed bytes
-        let freed = events.iter()
+        let freed = events
+            .iter()
             .find_map(|e| {
-                e.as_any().downcast_ref::<GarbageCollected>().map(|gc| gc.freed_bytes)
+                e.downcast_ref::<GarbageCollected>()
+                    .map(|gc| gc.freed_bytes)
             })
             .unwrap_or(0);
 
@@ -341,22 +367,26 @@ pub struct NixServiceFactory {
 
 impl NixServiceFactory {
     /// Create a new service factory
-    #[must_use] pub fn new(projection: NixProjection) -> Self {
+    #[must_use]
+    pub fn new(projection: NixProjection) -> Self {
         Self { projection }
     }
 
     /// Create a development service
-    #[must_use] pub fn development_service(&self) -> NixDevelopmentService {
+    #[must_use]
+    pub fn development_service(&self) -> NixDevelopmentService {
         NixDevelopmentService::new(self.projection.clone())
     }
 
     /// Create a configuration service
-    #[must_use] pub fn configuration_service(&self) -> NixOSConfigurationService {
+    #[must_use]
+    pub fn configuration_service(&self) -> NixOSConfigurationService {
         NixOSConfigurationService::new(self.projection.clone())
     }
 
     /// Create a package service
-    #[must_use] pub fn package_service(&self) -> NixPackageService {
+    #[must_use]
+    pub fn package_service(&self) -> NixPackageService {
         NixPackageService::new(self.projection.clone())
     }
-} 
+}

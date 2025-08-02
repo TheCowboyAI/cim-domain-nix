@@ -1,11 +1,10 @@
 //! CQRS adapter for Nix domain
 
-use crate::commands::{CreateFlake, UpdateFlake, BuildPackage};
-use crate::handlers::NixCommandHandler;
 use crate::aggregate::FlakeAggregate;
+use crate::commands::{BuildPackage, CreateFlake, UpdateFlake};
+use crate::handlers::NixCommandHandler;
 use cim_domain::{
-    Command, CommandHandler, CommandAcknowledgment, CommandStatus,
-    EntityId, CommandEnvelope
+    Command, CommandAcknowledgment, CommandEnvelope, CommandHandler, CommandStatus, EntityId,
 };
 use std::sync::Arc;
 
@@ -40,9 +39,7 @@ pub struct CreateFlakeHandler {
 impl CreateFlakeHandler {
     /// Create a new `CreateFlake` handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
-        Self {
-            nix_handler,
-        }
+        Self { nix_handler }
     }
 }
 
@@ -50,12 +47,12 @@ impl CommandHandler<CreateFlake> for CreateFlakeHandler {
     fn handle(&mut self, envelope: CommandEnvelope<CreateFlake>) -> CommandAcknowledgment {
         // Execute the command through the Nix handler
         let command = envelope.command;
-        
+
         // Use the nix_handler to actually create the flake
         // For now, we'll use default values for packages and dev_shells
         let packages: Vec<String> = vec![];
         let dev_shells: Vec<String> = vec!["default".to_string()];
-        
+
         match futures::executor::block_on(self.nix_handler.handle_create_flake(
             &command.path.to_string_lossy(),
             &command.description,
@@ -73,7 +70,7 @@ impl CommandHandler<CreateFlake> for CreateFlakeHandler {
                 correlation_id: envelope.identity.correlation_id,
                 status: CommandStatus::Rejected,
                 reason: Some(e.to_string()),
-            }
+            },
         }
     }
 }
@@ -86,9 +83,7 @@ pub struct UpdateFlakeHandler {
 impl UpdateFlakeHandler {
     /// Create a new `UpdateFlake` handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
-        Self {
-            nix_handler,
-        }
+        Self { nix_handler }
     }
 }
 
@@ -96,14 +91,14 @@ impl CommandHandler<UpdateFlake> for UpdateFlakeHandler {
     fn handle(&mut self, envelope: CommandEnvelope<UpdateFlake>) -> CommandAcknowledgment {
         // Execute the command through the Nix handler
         let command = envelope.command;
-        
+
         // Use the nix_handler to actually update the flake
         let packages: Vec<String> = vec![];
         let dev_shells: Vec<String> = vec![];
-        
+
         match futures::executor::block_on(self.nix_handler.handle_update_flake(
             &command.path.to_string_lossy(),
-            None,  // No description update
+            None, // No description update
             &packages,
             &dev_shells,
         )) {
@@ -131,9 +126,7 @@ pub struct BuildPackageHandler {
 impl BuildPackageHandler {
     /// Create a new `BuildPackage` handler
     pub fn new(nix_handler: Arc<NixCommandHandler>) -> Self {
-        Self {
-            nix_handler,
-        }
+        Self { nix_handler }
     }
 }
 
@@ -141,11 +134,14 @@ impl CommandHandler<BuildPackage> for BuildPackageHandler {
     fn handle(&mut self, envelope: CommandEnvelope<BuildPackage>) -> CommandAcknowledgment {
         // Execute the command through the Nix handler
         let command = envelope.command;
-        
+
         // Use the nix_handler to actually build the package
         let attribute_str = command.attribute.segments.join(".");
-        let output_path = command.output_path.as_ref().map(|p| p.to_string_lossy().to_string());
-        
+        let output_path = command
+            .output_path
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string());
+
         match futures::executor::block_on(self.nix_handler.handle_build_package(
             &command.flake_ref,
             &attribute_str,
@@ -165,4 +161,4 @@ impl CommandHandler<BuildPackage> for BuildPackageHandler {
             },
         }
     }
-} 
+}

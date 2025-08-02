@@ -5,18 +5,27 @@
 
 pub mod cqrs_adapter;
 
+use crate::parser::{FlakeParser, NixFile};
 use crate::{
-    commands::{CreateFlake, UpdateFlake, AddFlakeInput, CheckFlake, DevelopFlake, BuildPackage, EvaluateExpression, RunGarbageCollection, NixCommand, CreateModule, CreateOverlay, CreateConfiguration, ActivateConfiguration},
-    events::{NixDomainEvent, FlakeCreated, FlakeUpdated, FlakeInputAdded, PackageBuilt, ExpressionEvaluated, GarbageCollected, ModuleCreated, OverlayCreated, ConfigurationCreated, ConfigurationActivated},
+    commands::{
+        ActivateConfiguration, AddFlakeInput, BuildPackage, CheckFlake, CreateConfiguration,
+        CreateFlake, CreateModule, CreateOverlay, DevelopFlake, EvaluateExpression, NixCommand,
+        RunGarbageCollection, UpdateFlake,
+    },
+    events::{
+        ConfigurationActivated, ConfigurationCreated, ExpressionEvaluated, FlakeCreated,
+        FlakeInputAdded, FlakeUpdated, GarbageCollected, ModuleCreated, OverlayCreated,
+        PackageBuilt,
+    },
     templates::FlakeTemplate,
+    value_objects::MessageIdentity,
     NixDomainError, Result,
 };
+use chrono::Utc;
 use std::path::PathBuf;
 use std::process::Command;
 use tokio::fs;
 use uuid::Uuid;
-use chrono::Utc;
-use crate::parser::{NixFile, FlakeParser};
 
 /// Handler for flake-related commands
 pub struct FlakeCommandHandler;
@@ -29,12 +38,16 @@ impl Default for FlakeCommandHandler {
 
 impl FlakeCommandHandler {
     /// Create a new flake command handler
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self
     }
 
     /// Handle create flake command
-    pub async fn create_flake(&self, cmd: CreateFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn create_flake(
+        &self,
+        cmd: CreateFlake,
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         // Create directory if it doesn't exist
         fs::create_dir_all(&cmd.path).await?;
 
@@ -59,7 +72,7 @@ impl FlakeCommandHandler {
 
         // Generate flake.nix content
         let flake_content = template.generate_flake_nix();
-        
+
         // Write flake.nix
         let flake_path = cmd.path.join("flake.nix");
         fs::write(&flake_path, flake_content).await?;
@@ -67,12 +80,12 @@ impl FlakeCommandHandler {
         // Write additional files for the template
         for (filename, content) in template.additional_files() {
             let file_path = cmd.path.join(&filename);
-            
+
             // Create parent directories if needed
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent).await?;
             }
-            
+
             fs::write(file_path, content).await?;
         }
 
@@ -90,7 +103,9 @@ impl FlakeCommandHandler {
             .args(["add", "flake.nix"])
             .current_dir(&cmd.path)
             .output()
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to add flake.nix to git: {e}")))?;
+            .map_err(|e| {
+                NixDomainError::CommandError(format!("Failed to add flake.nix to git: {e}"))
+            })?;
 
         // Run nix flake init if template was not provided
         if cmd.template.is_none() {
@@ -103,17 +118,21 @@ impl FlakeCommandHandler {
 
         let event = FlakeCreated {
             flake_id: Uuid::new_v4(),
+            identity: cmd.identity,
             path: cmd.path,
             description: cmd.description,
             template: cmd.template,
             timestamp: Utc::now(),
         };
 
-        Ok(vec![Box::new(event)])
+        Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
     }
 
     /// Handle update flake command
-    pub async fn update_flake(&self, cmd: UpdateFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn update_flake(
+        &self,
+        cmd: UpdateFlake,
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         // Run nix flake update
         let output = Command::new("nix")
             .args(["flake", "update"])
@@ -123,58 +142,65 @@ impl FlakeCommandHandler {
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         }
 
         let event = FlakeUpdated {
             flake_id: Uuid::new_v4(),
+            identity: cmd.identity,
             path: cmd.path,
             timestamp: Utc::now(),
         };
 
-        Ok(vec![Box::new(event)])
+        Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
     }
 
     /// Handle add flake input command
-    pub async fn add_flake_input(&self, cmd: AddFlakeInput) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn add_flake_input(
+        &self,
+        cmd: AddFlakeInput,
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         // Parse the flake using the new parser
         let flake_path = cmd.path.join("flake.nix");
         let file = NixFile::parse_file(&flake_path)?;
         let mut flake = FlakeParser::parse(&file)?;
-        
+
         // Add the input using AST manipulation
         flake.add_input(&cmd.name, &cmd.url)?;
-        
+
         // Write back the formatted result
         fs::write(&flake_path, flake.to_string()).await?;
-        
+
         // Run nix flake update for the new input
         let output = Command::new("nix")
             .args(["flake", "update", &cmd.name])
             .current_dir(&cmd.path)
             .output()
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to update flake input: {e}")))?;
+            .map_err(|e| {
+                NixDomainError::CommandError(format!("Failed to update flake input: {e}"))
+            })?;
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         }
 
         let event = FlakeInputAdded {
             flake_id: Uuid::new_v4(),
+            identity: cmd.identity,
             path: cmd.path.clone(),
             input_name: cmd.name,
             input_url: cmd.url,
             timestamp: Utc::now(),
         };
 
-        Ok(vec![Box::new(event)])
+        Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
     }
 
     /// Handle check flake command
-    pub async fn check_flake(&self, cmd: CheckFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn check_flake(&self, cmd: CheckFlake) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         let output = Command::new("nix")
             .args(["flake", "check"])
             .current_dir(&cmd.path)
@@ -183,7 +209,7 @@ impl FlakeCommandHandler {
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         }
 
@@ -192,9 +218,12 @@ impl FlakeCommandHandler {
     }
 
     /// Handle develop flake command
-    pub async fn develop_flake(&self, cmd: DevelopFlake) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn develop_flake(
+        &self,
+        cmd: DevelopFlake,
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         let mut args = vec!["develop"];
-        
+
         if let Some(command) = &cmd.command {
             args.push("-c");
             args.push(command);
@@ -208,7 +237,7 @@ impl FlakeCommandHandler {
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         }
 
@@ -228,17 +257,21 @@ impl Default for PackageCommandHandler {
 
 impl PackageCommandHandler {
     /// Create a new package command handler
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self
     }
 
     /// Handle build package command
-    pub async fn build_package(&self, cmd: BuildPackage) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn build_package(
+        &self,
+        cmd: BuildPackage,
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         let start_time = std::time::Instant::now();
-        
+
         // Build the package
         let mut args = vec!["build"];
-        
+
         // Create the flake URI with attribute
         let flake_uri = format!("{}#{}", cmd.flake_ref, cmd.attribute);
         args.push(&flake_uri);
@@ -257,7 +290,7 @@ impl PackageCommandHandler {
 
         if !output.status.success() {
             return Err(NixDomainError::BuildError(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         }
 
@@ -268,6 +301,7 @@ impl PackageCommandHandler {
 
         let event = PackageBuilt {
             package_id: Uuid::new_v4(),
+            identity: cmd.identity,
             flake_ref: cmd.flake_ref,
             attribute: cmd.attribute,
             output_path,
@@ -275,7 +309,7 @@ impl PackageCommandHandler {
             timestamp: Utc::now(),
         };
 
-        Ok(vec![Box::new(event)])
+        Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
     }
 }
 
@@ -290,20 +324,26 @@ impl Default for ExpressionCommandHandler {
 
 impl ExpressionCommandHandler {
     /// Create a new expression command handler
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self
     }
 
     /// Handle evaluate expression command
-    pub async fn evaluate_expression(&self, cmd: EvaluateExpression) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn evaluate_expression(
+        &self,
+        cmd: EvaluateExpression,
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         let output = Command::new("nix")
             .args(["eval", "--expr", &cmd.expression])
             .output()
-            .map_err(|e| NixDomainError::ExecutionError(format!("Failed to evaluate expression: {e}")))?;
+            .map_err(|e| {
+                NixDomainError::ExecutionError(format!("Failed to evaluate expression: {e}"))
+            })?;
 
         if !output.status.success() {
             return Err(NixDomainError::ExecutionError(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         }
 
@@ -311,12 +351,13 @@ impl ExpressionCommandHandler {
 
         let event = ExpressionEvaluated {
             expression_id: Uuid::new_v4(),
+            identity: cmd.identity,
             expression: cmd.expression,
             result,
             timestamp: Utc::now(),
         };
 
-        Ok(vec![Box::new(event)])
+        Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
     }
 }
 
@@ -331,12 +372,16 @@ impl Default for GarbageCollectionHandler {
 
 impl GarbageCollectionHandler {
     /// Create a new garbage collection handler
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self
     }
 
     /// Handle run garbage collection command
-    pub async fn run_garbage_collection(&self, cmd: RunGarbageCollection) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn run_garbage_collection(
+        &self,
+        cmd: RunGarbageCollection,
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         let mut args = vec!["store", "gc"];
 
         // Add older-than flag if specified
@@ -347,14 +392,13 @@ impl GarbageCollectionHandler {
             args.push(&days_str);
         }
 
-        let output = Command::new("nix")
-            .args(&args)
-            .output()
-            .map_err(|e| NixDomainError::CommandError(format!("Failed to run garbage collection: {e}")))?;
+        let output = Command::new("nix").args(&args).output().map_err(|e| {
+            NixDomainError::CommandError(format!("Failed to run garbage collection: {e}"))
+        })?;
 
         if !output.status.success() {
             return Err(NixDomainError::CommandError(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         }
 
@@ -364,12 +408,13 @@ impl GarbageCollectionHandler {
 
         let event = GarbageCollected {
             collection_id: Uuid::new_v4(),
+            identity: cmd.identity,
             freed_bytes,
             removed_paths: vec![], // In a real implementation, we'd parse these from output
             timestamp: Utc::now(),
         };
 
-        Ok(vec![Box::new(event)])
+        Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
     }
 }
 
@@ -393,7 +438,8 @@ impl Default for NixCommandHandler {
 
 impl NixCommandHandler {
     /// Create a new Nix command handler
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             flake_handler: FlakeCommandHandler::new(),
             package_handler: PackageCommandHandler::new(),
@@ -409,8 +455,9 @@ impl NixCommandHandler {
         description: &str,
         _packages: &[String],
         _dev_shells: &[String],
-    ) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         let cmd = CreateFlake {
+            identity: MessageIdentity::new_root(),
             path: PathBuf::from(name),
             description: description.to_string(),
             template: None,
@@ -425,8 +472,9 @@ impl NixCommandHandler {
         _description: Option<&str>,
         _packages: &[String],
         _dev_shells: &[String],
-    ) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         let cmd = UpdateFlake {
+            identity: MessageIdentity::new_root(),
             path: PathBuf::from(path),
         };
         self.flake_handler.update_flake(cmd).await
@@ -438,8 +486,9 @@ impl NixCommandHandler {
         flake_ref: &str,
         attribute: &str,
         output_path: Option<&str>,
-    ) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         let cmd = BuildPackage {
+            identity: MessageIdentity::new_root(),
             flake_ref: flake_ref.to_string(),
             attribute: crate::value_objects::AttributePath {
                 segments: attribute.split('.').map(String::from).collect(),
@@ -450,7 +499,10 @@ impl NixCommandHandler {
     }
 
     /// Handle any Nix command by delegating to the appropriate handler
-    pub async fn handle_command(&self, cmd: Box<dyn NixCommand>) -> Result<Vec<Box<dyn NixDomainEvent>>> {
+    pub async fn handle_command(
+        &self,
+        cmd: Box<dyn NixCommand>,
+    ) -> Result<Vec<Box<dyn std::any::Any + Send>>> {
         // Downcast to specific command types
         if let Some(create_flake) = cmd.as_any().downcast_ref::<CreateFlake>() {
             self.flake_handler.create_flake(create_flake.clone()).await
@@ -461,47 +513,55 @@ impl NixCommandHandler {
         } else if let Some(build_pkg) = cmd.as_any().downcast_ref::<BuildPackage>() {
             self.package_handler.build_package(build_pkg.clone()).await
         } else if let Some(eval_expr) = cmd.as_any().downcast_ref::<EvaluateExpression>() {
-            self.expression_handler.evaluate_expression(eval_expr.clone()).await
+            self.expression_handler
+                .evaluate_expression(eval_expr.clone())
+                .await
         } else if let Some(run_gc) = cmd.as_any().downcast_ref::<RunGarbageCollection>() {
             self.gc_handler.run_garbage_collection(run_gc.clone()).await
         } else if let Some(check_flake) = cmd.as_any().downcast_ref::<CheckFlake>() {
             self.flake_handler.check_flake(check_flake.clone()).await
         } else if let Some(develop_flake) = cmd.as_any().downcast_ref::<DevelopFlake>() {
-            self.flake_handler.develop_flake(develop_flake.clone()).await
+            self.flake_handler
+                .develop_flake(develop_flake.clone())
+                .await
         } else if let Some(create_module) = cmd.as_any().downcast_ref::<CreateModule>() {
             // For now, just return the event
             let event = ModuleCreated {
                 event_id: Uuid::new_v4(),
                 occurred_at: Utc::now(),
+                identity: create_module.identity.clone(),
                 module: create_module.module.clone(),
             };
-            Ok(vec![Box::new(event)])
+            Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
         } else if let Some(create_overlay) = cmd.as_any().downcast_ref::<CreateOverlay>() {
             // For now, just return the event
             let event = OverlayCreated {
                 event_id: Uuid::new_v4(),
                 occurred_at: Utc::now(),
+                identity: create_overlay.identity.clone(),
                 overlay: create_overlay.overlay.clone(),
             };
-            Ok(vec![Box::new(event)])
+            Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
         } else if let Some(create_config) = cmd.as_any().downcast_ref::<CreateConfiguration>() {
             // For now, just return the event
             let event = ConfigurationCreated {
                 event_id: Uuid::new_v4(),
                 occurred_at: Utc::now(),
+                identity: create_config.identity.clone(),
                 configuration: create_config.configuration.clone(),
             };
-            Ok(vec![Box::new(event)])
+            Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
         } else if let Some(activate_config) = cmd.as_any().downcast_ref::<ActivateConfiguration>() {
             // For now, just return the event
             let event = ConfigurationActivated {
                 event_id: Uuid::new_v4(),
                 occurred_at: Utc::now(),
+                identity: activate_config.identity.clone(),
                 configuration_id: Uuid::new_v4(), // In real impl, would look up the config
-                generation: 1, // In real impl, would increment
+                generation: 1,                    // In real impl, would increment
                 activation_type: activate_config.activation_type.clone(),
             };
-            Ok(vec![Box::new(event)])
+            Ok(vec![Box::new(event) as Box<dyn std::any::Any + Send>])
         } else {
             Err(NixDomainError::Other("Unknown command type".to_string()))
         }
@@ -545,4 +605,4 @@ mod tests {
         assert_eq!(parse_freed_bytes("1.5 GiB freed"), Some(1_610_612_736));
         assert_eq!(parse_freed_bytes("no match"), None);
     }
-} 
+}

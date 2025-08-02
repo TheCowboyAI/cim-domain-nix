@@ -1,7 +1,7 @@
 //! Flake template system for common project types
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Available flake templates
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,7 +32,8 @@ pub enum FlakeTemplate {
 
 impl FlakeTemplate {
     /// Generate flake.nix content for the template
-    #[must_use] pub fn generate_flake_nix(&self) -> String {
+    #[must_use]
+    pub fn generate_flake_nix(&self) -> String {
         match self {
             FlakeTemplate::Rust => self.rust_template(),
             FlakeTemplate::Python => self.python_template(),
@@ -49,7 +50,8 @@ impl FlakeTemplate {
     }
 
     /// Generate additional files for the template
-    #[must_use] pub fn additional_files(&self) -> HashMap<String, String> {
+    #[must_use]
+    pub fn additional_files(&self) -> HashMap<String, String> {
         let mut files = HashMap::new();
 
         match self {
@@ -57,17 +59,26 @@ impl FlakeTemplate {
                 files.insert(".envrc".to_string(), "use flake\n".to_string());
                 files.insert(".gitignore".to_string(), "/target\n/result\n".to_string());
                 files.insert("Cargo.toml".to_string(), self.rust_cargo_toml());
-                files.insert("src/main.rs".to_string(), "fn main() {\n    println!(\"Hello, world!\");\n}\n".to_string());
+                files.insert(
+                    "src/main.rs".to_string(),
+                    "fn main() {\n    println!(\"Hello, world!\");\n}\n".to_string(),
+                );
             }
             FlakeTemplate::Python => {
                 files.insert(".envrc".to_string(), "use flake\n".to_string());
-                files.insert(".gitignore".to_string(), "/.venv\n/__pycache__\n/result\n".to_string());
+                files.insert(
+                    ".gitignore".to_string(),
+                    "/.venv\n/__pycache__\n/result\n".to_string(),
+                );
                 files.insert("pyproject.toml".to_string(), self.python_pyproject_toml());
                 files.insert("src/__init__.py".to_string(), String::new());
             }
             FlakeTemplate::NodeJs => {
                 files.insert(".envrc".to_string(), "use flake\n".to_string());
-                files.insert(".gitignore".to_string(), "/node_modules\n/result\n".to_string());
+                files.insert(
+                    ".gitignore".to_string(),
+                    "/node_modules\n/result\n".to_string(),
+                );
                 files.insert("package.json".to_string(), self.nodejs_package_json());
             }
             _ => {}
@@ -118,7 +129,8 @@ impl FlakeTemplate {
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
         };
       });
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn python_template(&self) -> String {
@@ -155,7 +167,8 @@ impl FlakeTemplate {
           ];
         };
       });
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn nodejs_template(&self) -> String {
@@ -193,7 +206,8 @@ impl FlakeTemplate {
           ];
         };
       });
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn go_template(&self) -> String {
@@ -228,7 +242,8 @@ impl FlakeTemplate {
           ];
         };
       });
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn cpp_template(&self) -> String {
@@ -272,7 +287,8 @@ impl FlakeTemplate {
           ];
         };
       });
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn haskell_template(&self) -> String {
@@ -303,7 +319,8 @@ impl FlakeTemplate {
           ];
         };
       });
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn polyglot_template(&self) -> String {
@@ -356,7 +373,8 @@ impl FlakeTemplate {
           };
         };
       });
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn nixos_system_template(&self) -> String {
@@ -389,7 +407,8 @@ impl FlakeTemplate {
         ];
       };
     };
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn home_manager_template(&self) -> String {
@@ -415,7 +434,8 @@ impl FlakeTemplate {
         modules = [ ./home.nix ];
       };
     };
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn devshell_template(&self) -> String {
@@ -446,7 +466,8 @@ impl FlakeTemplate {
           '';
         };
       });
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn rust_cargo_toml(&self) -> String {
@@ -456,7 +477,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#.to_string()
+"#
+        .to_string()
     }
 
     fn python_pyproject_toml(&self) -> String {
@@ -477,7 +499,8 @@ mypy = "^1.0"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-"#.to_string()
+"#
+        .to_string()
     }
 
     fn nodejs_package_json(&self) -> String {
@@ -493,7 +516,8 @@ build-backend = "poetry.core.masonry.api"
   "author": "",
   "license": "ISC"
 }
-"#.to_string()
+"#
+        .to_string()
     }
 }
 
@@ -517,4 +541,4 @@ mod tests {
         assert!(files.contains_key("Cargo.toml"));
         assert!(files.contains_key("src/main.rs"));
     }
-} 
+}

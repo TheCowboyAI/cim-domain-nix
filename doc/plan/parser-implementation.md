@@ -1,5 +1,7 @@
 # Nix Parser Implementation Plan
 
+> **Note**: Parser has been implemented. This document describes the original plan and future enhancements. For current status, see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)
+
 ## Immediate Actions
 
 ### Step 1: Add Parser Dependencies

@@ -2,11 +2,11 @@
 //!
 //! This module provides factory methods for creating events according to CIM patterns.
 
-use crate::value_objects::{MessageIdentity, MessageFactory};
 use crate::events::*;
+use crate::value_objects::{MessageFactory, MessageIdentity};
 use chrono::Utc;
-use uuid::Uuid;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 /// Factory for creating Nix domain events
 pub struct NixEventFactory;

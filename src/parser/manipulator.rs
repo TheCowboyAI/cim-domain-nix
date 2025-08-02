@@ -1,6 +1,8 @@
 //! AST manipulation utilities for modifying Nix expressions
 
-use super::ast::{NixAst, AttrPath, AttrPathSegment, Binding, BindingValue, FunctionParam, BinaryOperator};
+use super::ast::{
+    AttrPath, AttrPathSegment, BinaryOperator, Binding, BindingValue, FunctionParam, NixAst,
+};
 use crate::Result;
 
 /// AST manipulator for transforming Nix expressions
@@ -8,43 +10,37 @@ pub struct AstManipulator;
 
 impl AstManipulator {
     /// Add a new attribute to an attribute set
-    pub fn add_attribute(
-        ast: &mut NixAst,
-        path: Vec<&str>,
-        value: NixAst,
-    ) -> Result<()> {
+    pub fn add_attribute(ast: &mut NixAst, path: Vec<&str>, value: NixAst) -> Result<()> {
         match ast {
             NixAst::AttrSet { bindings, .. } => {
                 let attr_path = AttrPath {
-                    segments: path.into_iter()
+                    segments: path
+                        .into_iter()
                         .map(|s| AttrPathSegment::Identifier(s.to_string()))
                         .collect(),
                 };
-                
+
                 bindings.push(Binding {
                     attr_path,
                     value: BindingValue::Value(value),
                 });
-                
+
                 Ok(())
             }
             _ => Err(crate::NixDomainError::ParseError(
-                "Can only add attributes to attribute sets".to_string()
-            ))
+                "Can only add attributes to attribute sets".to_string(),
+            )),
         }
     }
 
     /// Remove an attribute from an attribute set
-    pub fn remove_attribute(
-        ast: &mut NixAst,
-        path: Vec<&str>,
-    ) -> Result<Option<NixAst>> {
+    pub fn remove_attribute(ast: &mut NixAst, path: Vec<&str>) -> Result<Option<NixAst>> {
         match ast {
             NixAst::AttrSet { bindings, .. } => {
-                let pos = bindings.iter().position(|b| {
-                    Self::attr_path_matches(&b.attr_path, &path)
-                });
-                
+                let pos = bindings
+                    .iter()
+                    .position(|b| Self::attr_path_matches(&b.attr_path, &path));
+
                 if let Some(pos) = pos {
                     let binding = bindings.remove(pos);
                     match binding.value {
@@ -56,8 +52,8 @@ impl AstManipulator {
                 }
             }
             _ => Err(crate::NixDomainError::ParseError(
-                "Can only remove attributes from attribute sets".to_string()
-            ))
+                "Can only remove attributes from attribute sets".to_string(),
+            )),
         }
     }
 
@@ -83,16 +79,13 @@ impl AstManipulator {
                 Ok(None)
             }
             _ => Err(crate::NixDomainError::ParseError(
-                "Can only update attributes in attribute sets".to_string()
-            ))
+                "Can only update attributes in attribute sets".to_string(),
+            )),
         }
     }
 
     /// Get an attribute value by path
-    pub fn get_attribute<'a>(
-        ast: &'a NixAst,
-        path: Vec<&str>,
-    ) -> Option<&'a NixAst> {
+    pub fn get_attribute<'a>(ast: &'a NixAst, path: Vec<&str>) -> Option<&'a NixAst> {
         match ast {
             NixAst::AttrSet { bindings, .. } => {
                 for binding in bindings {
@@ -105,31 +98,25 @@ impl AstManipulator {
                 }
                 None
             }
-            _ => None
+            _ => None,
         }
     }
 
     /// Add an element to a list
-    pub fn add_list_element(
-        ast: &mut NixAst,
-        element: NixAst,
-    ) -> Result<()> {
+    pub fn add_list_element(ast: &mut NixAst, element: NixAst) -> Result<()> {
         match ast {
             NixAst::List(elements) => {
                 elements.push(element);
                 Ok(())
             }
             _ => Err(crate::NixDomainError::ParseError(
-                "Can only add elements to lists".to_string()
-            ))
+                "Can only add elements to lists".to_string(),
+            )),
         }
     }
 
     /// Remove an element from a list by index
-    pub fn remove_list_element(
-        ast: &mut NixAst,
-        index: usize,
-    ) -> Result<Option<NixAst>> {
+    pub fn remove_list_element(ast: &mut NixAst, index: usize) -> Result<Option<NixAst>> {
         match ast {
             NixAst::List(elements) => {
                 if index < elements.len() {
@@ -139,8 +126,8 @@ impl AstManipulator {
                 }
             }
             _ => Err(crate::NixDomainError::ParseError(
-                "Can only remove elements from lists".to_string()
-            ))
+                "Can only remove elements from lists".to_string(),
+            )),
         }
     }
 
@@ -184,7 +171,11 @@ impl AstManipulator {
                 }
                 Self::transform_nodes(body, transformer);
             }
-            NixAst::If { condition, then_branch, else_branch } => {
+            NixAst::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
                 Self::transform_nodes(condition, transformer);
                 Self::transform_nodes(then_branch, transformer);
                 Self::transform_nodes(else_branch, transformer);
@@ -230,11 +221,8 @@ impl AstManipulator {
         results
     }
 
-    fn find_nodes_recursive<'a, F>(
-        ast: &'a NixAst,
-        predicate: &F,
-        results: &mut Vec<&'a NixAst>,
-    ) where
+    fn find_nodes_recursive<'a, F>(ast: &'a NixAst, predicate: &F, results: &mut Vec<&'a NixAst>)
+    where
         F: Fn(&NixAst) -> bool,
     {
         if predicate(ast) {
@@ -269,7 +257,11 @@ impl AstManipulator {
                 }
                 Self::find_nodes_recursive(body, predicate, results);
             }
-            NixAst::If { condition, then_branch, else_branch } => {
+            NixAst::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
                 Self::find_nodes_recursive(condition, predicate, results);
                 Self::find_nodes_recursive(then_branch, predicate, results);
                 Self::find_nodes_recursive(else_branch, predicate, results);
@@ -367,7 +359,11 @@ impl AstManipulator {
                 }
                 Self::replace_nodes_recursive(body, predicate, replacer, count)?;
             }
-            NixAst::If { condition, then_branch, else_branch } => {
+            NixAst::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
                 Self::replace_nodes_recursive(condition, predicate, replacer, count)?;
                 Self::replace_nodes_recursive(then_branch, predicate, replacer, count)?;
                 Self::replace_nodes_recursive(else_branch, predicate, replacer, count)?;
@@ -411,12 +407,13 @@ impl AstManipulator {
             return false;
         }
 
-        path.segments.iter().zip(target.iter()).all(|(segment, target_part)| {
-            match segment {
+        path.segments
+            .iter()
+            .zip(target.iter())
+            .all(|(segment, target_part)| match segment {
                 AttrPathSegment::Identifier(name) => name == target_part,
                 _ => false,
-            }
-        })
+            })
     }
 
     /// Helper method for building simple functions
@@ -556,11 +553,8 @@ mod tests {
             bindings: Vec::new(),
         };
 
-        AstManipulator::add_attribute(
-            &mut ast,
-            vec!["foo"],
-            NixAst::String("bar".to_string()),
-        ).unwrap();
+        AstManipulator::add_attribute(&mut ast, vec!["foo"], NixAst::String("bar".to_string()))
+            .unwrap();
 
         let value = AstManipulator::get_attribute(&ast, vec!["foo"]);
         assert!(value.is_some());
@@ -573,17 +567,10 @@ mod tests {
             bindings: Vec::new(),
         };
 
-        AstManipulator::add_attribute(
-            &mut ast,
-            vec!["foo"],
-            NixAst::Integer(42),
-        ).unwrap();
+        AstManipulator::add_attribute(&mut ast, vec!["foo"], NixAst::Integer(42)).unwrap();
 
-        let old = AstManipulator::update_attribute(
-            &mut ast,
-            vec!["foo"],
-            NixAst::Integer(100),
-        ).unwrap();
+        let old =
+            AstManipulator::update_attribute(&mut ast, vec!["foo"], NixAst::Integer(100)).unwrap();
 
         assert!(matches!(old, Some(NixAst::Integer(42))));
         let value = AstManipulator::get_attribute(&ast, vec!["foo"]);
@@ -616,9 +603,7 @@ mod tests {
             ],
         };
 
-        let integers = AstManipulator::find_nodes(&ast, &|node| {
-            matches!(node, NixAst::Integer(_))
-        });
+        let integers = AstManipulator::find_nodes(&ast, &|node| matches!(node, NixAst::Integer(_)));
 
         assert_eq!(integers.len(), 2);
     }
@@ -635,10 +620,11 @@ mod tests {
             &mut ast,
             |node| matches!(node, NixAst::Integer(2)),
             |_| Some(NixAst::Integer(42)),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(count, 1);
-        
+
         match &ast {
             NixAst::List(elements) => {
                 assert!(matches!(elements[1], NixAst::Integer(42)));
@@ -655,11 +641,9 @@ mod tests {
             NixAst::Integer(3),
         ]);
 
-        AstManipulator::transform_nodes(&mut ast, &|node| {
-            match node {
-                NixAst::Integer(n) => Some(NixAst::Integer(*n * 2)),
-                _ => None,
-            }
+        AstManipulator::transform_nodes(&mut ast, &|node| match node {
+            NixAst::Integer(n) => Some(NixAst::Integer(*n * 2)),
+            _ => None,
         });
 
         match ast {
@@ -672,4 +656,4 @@ mod tests {
             _ => panic!("Expected list"),
         }
     }
-} 
+}

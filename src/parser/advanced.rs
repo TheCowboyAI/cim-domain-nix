@@ -1,13 +1,13 @@
 //! Advanced Nix parser with full AST manipulation capabilities
 
+use rnix::{SyntaxKind, SyntaxNode};
 use std::path::{Path, PathBuf};
-use rnix::{SyntaxNode, SyntaxKind};
 
-use crate::{Result, NixDomainError};
 use super::ast::{
-    NixAst, FunctionParam, PatternField, AttrPath, AttrPathSegment,
-    Binding, BindingValue, BinaryOperator, UnaryOperator, Location, LocatedAst
+    AttrPath, AttrPathSegment, BinaryOperator, Binding, BindingValue, FunctionParam, LocatedAst,
+    Location, NixAst, PatternField, UnaryOperator,
 };
+use crate::{NixDomainError, Result};
 
 /// Advanced parser with full AST capabilities
 pub struct AdvancedParser {
@@ -24,16 +24,13 @@ impl Default for AdvancedParser {
 impl AdvancedParser {
     /// Create a new advanced parser
     pub fn new() -> Self {
-        Self {
-            current_file: None,
-        }
+        Self { current_file: None }
     }
 
     /// Parse a file into our AST representation
     pub fn parse_file(&self, path: &Path) -> Result<LocatedAst> {
-        let content = std::fs::read_to_string(path)
-            .map_err(NixDomainError::IoError)?;
-        
+        let content = std::fs::read_to_string(path).map_err(NixDomainError::IoError)?;
+
         self.parse_string(&content)
     }
 
@@ -41,18 +38,19 @@ impl AdvancedParser {
     pub fn parse_string(&self, content: &str) -> Result<LocatedAst> {
         // Parse with rnix
         let parsed = rnix::Root::parse(content);
-        
+
         if !parsed.errors().is_empty() {
-            let errors: Vec<String> = parsed.errors()
+            let errors: Vec<String> = parsed
+                .errors()
                 .iter()
                 .map(std::string::ToString::to_string)
                 .collect();
             return Err(NixDomainError::ParseError(errors.join("; ")));
         }
-        
+
         let root = parsed.syntax();
         let ast = self.convert_node(&root)?;
-        
+
         Ok(LocatedAst {
             ast,
             location: self.node_location(&root),
@@ -65,30 +63,30 @@ impl AdvancedParser {
             // Literals
             SyntaxKind::NODE_LITERAL => self.convert_literal(node),
             SyntaxKind::NODE_STRING => self.convert_string(node),
-            
+
             // Identifiers
             SyntaxKind::NODE_IDENT => self.convert_identifier(node),
-            
+
             // Collections
             SyntaxKind::NODE_ATTR_SET => self.convert_attr_set(node),
             SyntaxKind::NODE_LIST => self.convert_list(node),
-            
+
             // Functions
             SyntaxKind::NODE_LAMBDA => self.convert_lambda(node),
             SyntaxKind::NODE_APPLY => self.convert_apply(node),
-            
+
             // Control flow
             SyntaxKind::NODE_LET_IN => self.convert_let(node),
             SyntaxKind::NODE_IF_ELSE => self.convert_if(node),
             SyntaxKind::NODE_WITH => self.convert_with(node),
             SyntaxKind::NODE_ASSERT => self.convert_assert(node),
-            
+
             // Operations
             SyntaxKind::NODE_BIN_OP => self.convert_binary_op(node),
             SyntaxKind::NODE_UNARY_OP => self.convert_unary_op(node),
             SyntaxKind::NODE_SELECT => self.convert_select(node),
             SyntaxKind::NODE_HAS_ATTR => self.convert_has_attr(node),
-            
+
             // Root node - process its first child
             SyntaxKind::NODE_ROOT => {
                 if let Some(child) = node.first_child() {
@@ -97,12 +95,12 @@ impl AdvancedParser {
                     Err(NixDomainError::ParseError("Empty file".to_string()))
                 }
             }
-            
+
             _ => {
                 // Check if this is a literal token
                 if let Some(token) = node.first_token() {
                     let text = token.text();
-                    
+
                     // Try to parse as literal
                     if text == "true" {
                         return Ok(NixAst::Bool(true));
@@ -116,33 +114,39 @@ impl AdvancedParser {
                         return Ok(NixAst::Float(float));
                     }
                 }
-                
+
                 // Try to find a meaningful child node
                 for child in node.children() {
-                    if !matches!(child.kind(), SyntaxKind::TOKEN_WHITESPACE | SyntaxKind::TOKEN_COMMENT) {
+                    if !matches!(
+                        child.kind(),
+                        SyntaxKind::TOKEN_WHITESPACE | SyntaxKind::TOKEN_COMMENT
+                    ) {
                         return self.convert_node(&child);
                     }
                 }
-                
+
                 // Check if this is an import (import is not a special node in newer rnix)
                 if node.text().to_string().starts_with("import") {
                     return self.convert_import_expr(node);
                 }
-                
+
                 // As a last resort, treat it as an identifier
                 let text = node.text().to_string().trim().to_string();
                 if !text.is_empty() {
                     return Ok(NixAst::Identifier(text));
                 }
-                
-                Err(NixDomainError::ParseError(format!("Unsupported node kind: {:?}", node.kind())))
+
+                Err(NixDomainError::ParseError(format!(
+                    "Unsupported node kind: {:?}",
+                    node.kind()
+                )))
             }
         }
     }
 
     fn convert_literal(&self, node: &SyntaxNode) -> Result<NixAst> {
         let text = node.text().to_string();
-        
+
         // Try to parse as different literal types
         if text == "true" {
             Ok(NixAst::Bool(true))
@@ -155,13 +159,15 @@ impl AdvancedParser {
         } else if let Ok(float) = text.parse::<f64>() {
             Ok(NixAst::Float(float))
         } else {
-            Err(NixDomainError::ParseError(format!("Unknown literal: {text}")))
+            Err(NixDomainError::ParseError(format!(
+                "Unknown literal: {text}"
+            )))
         }
     }
 
     fn convert_string(&self, node: &SyntaxNode) -> Result<NixAst> {
         let text = node.text().to_string();
-        
+
         // Handle different string types
         if text.starts_with("''") {
             // Indented string
@@ -216,14 +222,20 @@ impl AdvancedParser {
             }
         }
 
-        Ok(NixAst::AttrSet { recursive, bindings })
+        Ok(NixAst::AttrSet {
+            recursive,
+            bindings,
+        })
     }
 
     fn convert_list(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut elements = Vec::new();
 
         for child in node.children() {
-            if !matches!(child.kind(), SyntaxKind::TOKEN_WHITESPACE | SyntaxKind::TOKEN_COMMENT) {
+            if !matches!(
+                child.kind(),
+                SyntaxKind::TOKEN_WHITESPACE | SyntaxKind::TOKEN_COMMENT
+            ) {
                 elements.push(self.convert_node(&child)?);
             }
         }
@@ -233,12 +245,14 @@ impl AdvancedParser {
 
     fn convert_lambda(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         // First child is the parameter
         let param = if let Some(param_node) = children.next() {
             self.convert_function_param(&param_node)?
         } else {
-            return Err(NixDomainError::ParseError("Lambda missing parameter".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Lambda missing parameter".to_string(),
+            ));
         };
 
         // Skip the colon
@@ -248,7 +262,9 @@ impl AdvancedParser {
         let body = if let Some(body_node) = children.next() {
             Box::new(self.convert_node(&body_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Lambda missing body".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Lambda missing body".to_string(),
+            ));
         };
 
         Ok(NixAst::Function { param, body })
@@ -256,17 +272,21 @@ impl AdvancedParser {
 
     fn convert_apply(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         let function = if let Some(func_node) = children.next() {
             Box::new(self.convert_node(&func_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Apply missing function".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Apply missing function".to_string(),
+            ));
         };
 
         let argument = if let Some(arg_node) = children.next() {
             Box::new(self.convert_node(&arg_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Apply missing argument".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Apply missing argument".to_string(),
+            ));
         };
 
         Ok(NixAst::Apply { function, argument })
@@ -300,21 +320,24 @@ impl AdvancedParser {
             }
         }
 
-        let body = body.ok_or_else(|| NixDomainError::ParseError("Let missing body".to_string()))?;
+        let body =
+            body.ok_or_else(|| NixDomainError::ParseError("Let missing body".to_string()))?;
 
         Ok(NixAst::Let { bindings, body })
     }
 
     fn convert_if(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         // Skip 'if' token
         children.next();
 
         let condition = if let Some(cond_node) = children.next() {
             Box::new(self.convert_node(&cond_node)?)
         } else {
-            return Err(NixDomainError::ParseError("If missing condition".to_string()));
+            return Err(NixDomainError::ParseError(
+                "If missing condition".to_string(),
+            ));
         };
 
         // Skip 'then' token
@@ -323,7 +346,9 @@ impl AdvancedParser {
         let then_branch = if let Some(then_node) = children.next() {
             Box::new(self.convert_node(&then_node)?)
         } else {
-            return Err(NixDomainError::ParseError("If missing then branch".to_string()));
+            return Err(NixDomainError::ParseError(
+                "If missing then branch".to_string(),
+            ));
         };
 
         // Skip 'else' token
@@ -332,22 +357,30 @@ impl AdvancedParser {
         let else_branch = if let Some(else_node) = children.next() {
             Box::new(self.convert_node(&else_node)?)
         } else {
-            return Err(NixDomainError::ParseError("If missing else branch".to_string()));
+            return Err(NixDomainError::ParseError(
+                "If missing else branch".to_string(),
+            ));
         };
 
-        Ok(NixAst::If { condition, then_branch, else_branch })
+        Ok(NixAst::If {
+            condition,
+            then_branch,
+            else_branch,
+        })
     }
 
     fn convert_with(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         // Skip 'with' token
         children.next();
 
         let namespace = if let Some(ns_node) = children.next() {
             Box::new(self.convert_node(&ns_node)?)
         } else {
-            return Err(NixDomainError::ParseError("With missing namespace".to_string()));
+            return Err(NixDomainError::ParseError(
+                "With missing namespace".to_string(),
+            ));
         };
 
         // Skip semicolon
@@ -364,14 +397,16 @@ impl AdvancedParser {
 
     fn convert_assert(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         // Skip 'assert' token
         children.next();
 
         let condition = if let Some(cond_node) = children.next() {
             Box::new(self.convert_node(&cond_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Assert missing condition".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Assert missing condition".to_string(),
+            ));
         };
 
         // Skip semicolon
@@ -380,7 +415,9 @@ impl AdvancedParser {
         let body = if let Some(body_node) = children.next() {
             Box::new(self.convert_node(&body_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Assert missing body".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Assert missing body".to_string(),
+            ));
         };
 
         Ok(NixAst::Assert { condition, body })
@@ -388,23 +425,29 @@ impl AdvancedParser {
 
     fn convert_binary_op(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         let left = if let Some(left_node) = children.next() {
             Box::new(self.convert_node(&left_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Binary op missing left operand".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Binary op missing left operand".to_string(),
+            ));
         };
 
         let op = if let Some(op_token) = children.next() {
             self.parse_binary_operator(&op_token.text().to_string())?
         } else {
-            return Err(NixDomainError::ParseError("Binary op missing operator".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Binary op missing operator".to_string(),
+            ));
         };
 
         let right = if let Some(right_node) = children.next() {
             Box::new(self.convert_node(&right_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Binary op missing right operand".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Binary op missing right operand".to_string(),
+            ));
         };
 
         Ok(NixAst::BinaryOp { op, left, right })
@@ -412,17 +455,21 @@ impl AdvancedParser {
 
     fn convert_unary_op(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         let op = if let Some(op_token) = children.next() {
             self.parse_unary_operator(&op_token.text().to_string())?
         } else {
-            return Err(NixDomainError::ParseError("Unary op missing operator".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Unary op missing operator".to_string(),
+            ));
         };
 
         let operand = if let Some(operand_node) = children.next() {
             Box::new(self.convert_node(&operand_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Unary op missing operand".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Unary op missing operand".to_string(),
+            ));
         };
 
         Ok(NixAst::UnaryOp { op, operand })
@@ -430,11 +477,13 @@ impl AdvancedParser {
 
     fn convert_select(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         let expr = if let Some(expr_node) = children.next() {
             Box::new(self.convert_node(&expr_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Select missing expression".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Select missing expression".to_string(),
+            ));
         };
 
         // Skip dot
@@ -443,26 +492,36 @@ impl AdvancedParser {
         let attr_path = if let Some(path_node) = children.next() {
             self.parse_attr_path(&path_node)?
         } else {
-            return Err(NixDomainError::ParseError("Select missing attribute path".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Select missing attribute path".to_string(),
+            ));
         };
 
         // Check for default value (or syntax)
         let default = if children.any(|c| c.text() == "or") {
-            children.next().map(|n| Box::new(self.convert_node(&n).unwrap()))
+            children
+                .next()
+                .map(|n| Box::new(self.convert_node(&n).unwrap()))
         } else {
             None
         };
 
-        Ok(NixAst::Select { expr, attr_path, default })
+        Ok(NixAst::Select {
+            expr,
+            attr_path,
+            default,
+        })
     }
 
     fn convert_has_attr(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         let expr = if let Some(expr_node) = children.next() {
             Box::new(self.convert_node(&expr_node)?)
         } else {
-            return Err(NixDomainError::ParseError("HasAttr missing expression".to_string()));
+            return Err(NixDomainError::ParseError(
+                "HasAttr missing expression".to_string(),
+            ));
         };
 
         // Skip ?
@@ -471,7 +530,9 @@ impl AdvancedParser {
         let attr_path = if let Some(path_node) = children.next() {
             self.parse_attr_path(&path_node)?
         } else {
-            return Err(NixDomainError::ParseError("HasAttr missing attribute path".to_string()));
+            return Err(NixDomainError::ParseError(
+                "HasAttr missing attribute path".to_string(),
+            ));
         };
 
         Ok(NixAst::HasAttr { expr, attr_path })
@@ -479,14 +540,16 @@ impl AdvancedParser {
 
     fn convert_import_expr(&self, node: &SyntaxNode) -> Result<NixAst> {
         let mut children = node.children();
-        
+
         // Skip 'import' token
         children.next();
 
         let path = if let Some(path_node) = children.next() {
             Box::new(self.convert_node(&path_node)?)
         } else {
-            return Err(NixDomainError::ParseError("Import missing path".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Import missing path".to_string(),
+            ));
         };
 
         Ok(NixAst::Import(path))
@@ -498,14 +561,16 @@ impl AdvancedParser {
         // Parse a key = value binding
         let text = node.text().to_string();
         let parts: Vec<&str> = text.split('=').collect();
-        
+
         if parts.len() != 2 {
-            return Err(NixDomainError::ParseError("Invalid key-value binding".to_string()));
+            return Err(NixDomainError::ParseError(
+                "Invalid key-value binding".to_string(),
+            ));
         }
-        
+
         let key = parts[0].trim();
         let value_str = parts[1].trim().trim_end_matches(';').trim();
-        
+
         // Simple parsing for common cases
         let value = if value_str.starts_with('"') && value_str.ends_with('"') {
             NixAst::String(value_str.trim_matches('"').to_string())
@@ -518,7 +583,7 @@ impl AdvancedParser {
         } else {
             NixAst::Identifier(value_str.to_string())
         };
-        
+
         Ok(Binding {
             attr_path: AttrPath {
                 segments: vec![AttrPathSegment::Identifier(key.to_string())],
@@ -538,19 +603,26 @@ impl AdvancedParser {
 
     fn convert_function_param(&self, node: &SyntaxNode) -> Result<FunctionParam> {
         match node.kind() {
-            SyntaxKind::NODE_IDENT => {
-                Ok(FunctionParam::Identifier(node.text().to_string()))
-            }
+            SyntaxKind::NODE_IDENT => Ok(FunctionParam::Identifier(node.text().to_string())),
             SyntaxKind::NODE_PATTERN => {
                 // Parse pattern { a, b ? default, ... }
                 let (fields, bind, ellipsis) = self.parse_pattern(node)?;
-                Ok(FunctionParam::Pattern { fields, bind, ellipsis })
+                Ok(FunctionParam::Pattern {
+                    fields,
+                    bind,
+                    ellipsis,
+                })
             }
-            _ => Err(NixDomainError::ParseError("Invalid function parameter".to_string()))
+            _ => Err(NixDomainError::ParseError(
+                "Invalid function parameter".to_string(),
+            )),
         }
     }
 
-    fn parse_pattern(&self, _node: &SyntaxNode) -> Result<(Vec<PatternField>, Option<String>, bool)> {
+    fn parse_pattern(
+        &self,
+        _node: &SyntaxNode,
+    ) -> Result<(Vec<PatternField>, Option<String>, bool)> {
         let fields = Vec::new();
         let bind = None;
         let ellipsis = false;
@@ -592,7 +664,9 @@ impl AdvancedParser {
             "->" => Ok(BinaryOperator::Implies),
             "++" => Ok(BinaryOperator::Concat),
             "//" => Ok(BinaryOperator::Update),
-            _ => Err(NixDomainError::ParseError(format!("Unknown binary operator: {text}")))
+            _ => Err(NixDomainError::ParseError(format!(
+                "Unknown binary operator: {text}"
+            ))),
         }
     }
 
@@ -600,7 +674,9 @@ impl AdvancedParser {
         match text {
             "!" => Ok(UnaryOperator::Not),
             "-" => Ok(UnaryOperator::Negate),
-            _ => Err(NixDomainError::ParseError(format!("Unknown unary operator: {text}")))
+            _ => Err(NixDomainError::ParseError(format!(
+                "Unknown unary operator: {text}"
+            ))),
         }
     }
 
@@ -613,7 +689,7 @@ impl AdvancedParser {
         let range = node.text_range();
         Location {
             file: self.current_file.clone(),
-            line: 0, // TODO: Calculate line number
+            line: 0,   // TODO: Calculate line number
             column: 0, // TODO: Calculate column
             offset: range.start().into(),
             length: range.len().into(),
@@ -654,10 +730,15 @@ mod tests {
     #[test]
     fn test_parse_attribute_set() {
         let parser = AdvancedParser::new();
-        let ast = parser.parse_string(r#"{ foo = 42; bar = "hello"; }"#).unwrap();
-        
+        let ast = parser
+            .parse_string(r#"{ foo = 42; bar = "hello"; }"#)
+            .unwrap();
+
         match ast.ast {
-            NixAst::AttrSet { recursive, bindings } => {
+            NixAst::AttrSet {
+                recursive,
+                bindings,
+            } => {
                 assert!(!recursive);
                 assert_eq!(bindings.len(), 2);
             }
@@ -669,7 +750,7 @@ mod tests {
     fn test_parse_list() {
         let parser = AdvancedParser::new();
         let ast = parser.parse_string(r#"[ 1 2 3 "foo" ]"#).unwrap();
-        
+
         match ast.ast {
             NixAst::List(elements) => {
                 assert_eq!(elements.len(), 4);
@@ -677,4 +758,4 @@ mod tests {
             _ => panic!("Expected list"),
         }
     }
-} 
+}

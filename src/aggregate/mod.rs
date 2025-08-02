@@ -5,19 +5,19 @@
 
 use crate::{
     commands::{
-        CreateFlake, AddFlakeInput, CreateModule, CreateOverlay,
-        CreateConfiguration, ActivateConfiguration
+        ActivateConfiguration, AddFlakeInput, CreateConfiguration, CreateFlake, CreateModule,
+        CreateOverlay,
     },
     events::{
-        FlakeCreated, FlakeInputAdded, ModuleCreated, OverlayCreated,
-        ConfigurationCreated, ConfigurationActivated, NixEventFactory
+        ConfigurationActivated, ConfigurationCreated, FlakeCreated, FlakeInputAdded, ModuleCreated,
+        NixEventFactory, OverlayCreated,
     },
-    value_objects::{Flake, NixModule, Overlay, NixOSConfiguration},
-    Result, NixDomainError,
+    value_objects::{Flake, NixModule, NixOSConfiguration, Overlay},
+    NixDomainError, Result,
 };
+use chrono::Utc;
 use cim_domain::AggregateRoot;
 use uuid::Uuid;
-use chrono::Utc;
 
 /// Represents a Nix flake aggregate root
 #[derive(Debug, Clone)]
@@ -58,7 +58,10 @@ impl FlakeAggregate {
     /// # Errors
     ///
     /// Returns an error if the command type is unknown
-    pub fn handle_command(&mut self, cmd: Box<dyn std::any::Any>) -> Result<Vec<Box<dyn std::any::Any>>> {
+    pub fn handle_command(
+        &mut self,
+        cmd: Box<dyn std::any::Any>,
+    ) -> Result<Vec<Box<dyn std::any::Any>>> {
         let mut events = Vec::new();
 
         if let Some(create_flake) = cmd.downcast_ref::<CreateFlake>() {
@@ -113,11 +116,11 @@ impl AggregateRoot for FlakeAggregate {
     fn id(&self) -> Self::Id {
         self.id
     }
-    
+
     fn version(&self) -> u64 {
         self.version
     }
-    
+
     fn increment_version(&mut self) {
         self.version += 1;
     }
@@ -140,12 +143,13 @@ impl ModuleAggregate {
     /// Returns an error if module creation fails
     pub fn handle_create_module(cmd: CreateModule) -> Result<(Self, Vec<ModuleCreated>)> {
         let aggregate = Self {
-            id: cmd.command_id,
+            id: cmd.module.id,
             module: cmd.module.clone(),
         };
         let event = ModuleCreated {
             event_id: Uuid::new_v4(),
             occurred_at: Utc::now(),
+            identity: cmd.identity,
             module: cmd.module,
         };
         Ok((aggregate, vec![event]))
@@ -169,12 +173,13 @@ impl OverlayAggregate {
     /// Returns an error if overlay creation fails
     pub fn handle_create_overlay(cmd: CreateOverlay) -> Result<(Self, Vec<OverlayCreated>)> {
         let aggregate = Self {
-            id: cmd.command_id,
+            id: cmd.overlay.id,
             overlay: cmd.overlay.clone(),
         };
         let event = OverlayCreated {
             event_id: Uuid::new_v4(),
             occurred_at: Utc::now(),
+            identity: cmd.identity,
             overlay: cmd.overlay,
         };
         Ok((aggregate, vec![event]))
@@ -202,7 +207,9 @@ impl ConfigurationAggregate {
     /// # Errors
     ///
     /// Returns an error if configuration creation fails
-    pub fn handle_create_configuration(cmd: CreateConfiguration) -> Result<(Self, Vec<ConfigurationCreated>)> {
+    pub fn handle_create_configuration(
+        cmd: CreateConfiguration,
+    ) -> Result<(Self, Vec<ConfigurationCreated>)> {
         let id = Uuid::new_v4();
         let aggregate = Self {
             id,
@@ -214,6 +221,7 @@ impl ConfigurationAggregate {
         let event = ConfigurationCreated {
             event_id: Uuid::new_v4(),
             occurred_at: Utc::now(),
+            identity: cmd.identity,
             configuration: cmd.configuration,
         };
         Ok((aggregate, vec![event]))
@@ -224,16 +232,20 @@ impl ConfigurationAggregate {
     /// # Errors
     ///
     /// Returns an error if configuration activation fails
-    pub fn handle_activate_configuration(&mut self, cmd: ActivateConfiguration) -> Result<Vec<ConfigurationActivated>> {
+    pub fn handle_activate_configuration(
+        &mut self,
+        cmd: ActivateConfiguration,
+    ) -> Result<Vec<ConfigurationActivated>> {
         self.is_active = true;
         self.current_generation += 1;
         let event = ConfigurationActivated {
             event_id: Uuid::new_v4(),
             occurred_at: Utc::now(),
+            identity: cmd.identity,
             configuration_id: self.id,
             generation: self.current_generation,
             activation_type: cmd.activation_type,
         };
         Ok(vec![event])
     }
-} 
+}

@@ -108,7 +108,11 @@ impl MessageIdentity {
     }
 
     /// Create a message identity with explicit IDs
-    pub fn new(message_id: MessageId, correlation_id: CorrelationId, causation_id: CausationId) -> Self {
+    pub fn new(
+        message_id: MessageId,
+        correlation_id: CorrelationId,
+        causation_id: CausationId,
+    ) -> Self {
         Self {
             message_id,
             correlation_id,
@@ -139,7 +143,7 @@ mod tests {
     #[test]
     fn test_root_message_identity() {
         let identity = MessageIdentity::new_root();
-        
+
         // For root messages, all IDs should be the same
         assert_eq!(identity.message_id.0, identity.correlation_id.0);
         assert_eq!(identity.message_id.0, identity.causation_id.0);
@@ -149,7 +153,7 @@ mod tests {
     fn test_caused_message_identity() {
         let root = MessageIdentity::new_root();
         let caused = MessageIdentity::new_caused_by(&root);
-        
+
         // Caused message should have same correlation but different message ID
         assert_ne!(caused.message_id.0, root.message_id.0);
         assert_eq!(caused.correlation_id.0, root.correlation_id.0);
@@ -160,7 +164,7 @@ mod tests {
     fn test_message_factory() {
         let root = MessageFactory::create_root_identity();
         let caused = MessageFactory::create_caused_identity(&root);
-        
+
         assert_eq!(root.message_id.0, root.correlation_id.0);
         assert_eq!(caused.correlation_id.0, root.correlation_id.0);
         assert_eq!(caused.causation_id.0, root.message_id.0);

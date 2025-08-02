@@ -16,9 +16,9 @@ mod subject_tests;
 
 // Re-export commonly used types
 pub use client::NatsClient;
-pub use config::{NatsConfig, NatsAuth, NatsTls};
+pub use config::{NatsAuth, NatsConfig, NatsTls};
 pub use error::{NatsError, Result};
 pub use health::{HealthService, ServiceDiscovery, ServiceInfo};
 pub use publisher::{EventPublisher, EventPublishing};
-pub use subject::{NixSubject, SubjectMapper, Aggregate, CommandAction, EventAction, QueryAction};
-pub use subscriber::{CommandSubscriber, EventSubscriber, CommandHandler, EventHandler};
+pub use subject::{Aggregate, CommandAction, EventAction, NixSubject, QueryAction, SubjectMapper};
+pub use subscriber::{CommandHandler, CommandSubscriber, EventHandler, EventSubscriber};

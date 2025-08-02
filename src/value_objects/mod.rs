@@ -4,32 +4,9 @@
 //! core concepts in the Nix ecosystem.
 
 mod message_identity;
-pub use message_identity::{MessageId, CorrelationId, CausationId, MessageIdentity, MessageFactory};
-//!
-//! # Examples
-//!
-//! ## Working with Flake References
-//!
-//! ```
-//! use cim_domain_nix::value_objects::FlakeRef;
-//!
-//! let flake = FlakeRef::new("github:NixOS/nixpkgs")
-//!     .with_revision("nixos-23.11")
-//!     .with_subflake("lib");
-//!
-//! assert_eq!(flake.to_string(), "github:NixOS/nixpkgs/nixos-23.11#lib");
-//! ```
-//!
-//! ## Parsing Store Paths
-//!
-//! ```
-//! use cim_domain_nix::value_objects::StorePath;
-//!
-//! let path = StorePath::parse("/nix/store/abc123-hello-1.0").unwrap();
-//! assert_eq!(path.hash, "abc123");
-//! assert_eq!(path.name, "hello-1.0");
-//! assert_eq!(path.to_string(), "/nix/store/abc123-hello-1.0");
-//! ```
+pub use message_identity::{
+    CausationId, CorrelationId, MessageFactory, MessageId, MessageIdentity,
+};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -70,19 +47,20 @@ impl FlakeRef {
     }
 
     /// Convert to a Nix flake reference string
-    #[must_use] pub fn to_nix_string(&self) -> String {
+    #[must_use]
+    pub fn to_nix_string(&self) -> String {
         let mut result = self.uri.clone();
-        
+
         if let Some(rev) = &self.revision {
             result.push('/');
             result.push_str(rev);
         }
-        
+
         if let Some(sub) = &self.subflake {
             result.push('#');
             result.push_str(sub);
         }
-        
+
         result
     }
 }
@@ -102,7 +80,8 @@ pub struct AttributePath {
 
 impl AttributePath {
     /// Create a new attribute path from segments
-    #[must_use] pub fn new(segments: Vec<String>) -> Self {
+    #[must_use]
+    pub fn new(segments: Vec<String>) -> Self {
         Self { segments }
     }
 
@@ -201,7 +180,7 @@ impl StorePath {
     /// Parse a store path string
     pub fn parse(path: &str) -> Result<Self, String> {
         let path_buf = PathBuf::from(path);
-        
+
         // Check if it's in the Nix store
         if !path.starts_with("/nix/store/") {
             return Err("Not a valid Nix store path".to_string());
@@ -276,7 +255,7 @@ pub struct NixExpression {
     pub text: String,
     /// Whether this expression is pure
     pub is_pure: bool,
-} 
+}
 
 /// Represents different types of Nix values
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -298,5 +277,3 @@ pub enum NixValue {
     /// Null value
     Null,
 }
-
- 

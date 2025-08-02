@@ -58,21 +58,21 @@ pub enum CommandAction {
     UpdateFlake,
     AddFlakeInput,
     RemoveFlakeInput,
-    
+
     // Package commands
     BuildPackage,
     CachePackage,
-    
+
     // Module commands
     CreateModule,
     UpdateModule,
     DeleteModule,
-    
+
     // Overlay commands
     CreateOverlay,
     UpdateOverlay,
     DeleteOverlay,
-    
+
     // Configuration commands
     CreateConfiguration,
     UpdateConfiguration,
@@ -88,21 +88,21 @@ impl CommandAction {
             CommandAction::UpdateFlake => "update",
             CommandAction::AddFlakeInput => "add_input",
             CommandAction::RemoveFlakeInput => "remove_input",
-            
+
             // Package commands
             CommandAction::BuildPackage => "build",
             CommandAction::CachePackage => "cache",
-            
+
             // Module commands
             CommandAction::CreateModule => "create",
             CommandAction::UpdateModule => "update",
             CommandAction::DeleteModule => "delete",
-            
+
             // Overlay commands
             CommandAction::CreateOverlay => "create",
             CommandAction::UpdateOverlay => "update",
             CommandAction::DeleteOverlay => "delete",
-            
+
             // Configuration commands
             CommandAction::CreateConfiguration => "create",
             CommandAction::UpdateConfiguration => "update",
@@ -110,25 +110,24 @@ impl CommandAction {
             CommandAction::RollbackConfiguration => "rollback",
         }
     }
-    
+
     pub fn aggregate(&self) -> Aggregate {
         match self {
             CommandAction::CreateFlake
             | CommandAction::UpdateFlake
             | CommandAction::AddFlakeInput
             | CommandAction::RemoveFlakeInput => Aggregate::Flake,
-            
-            CommandAction::BuildPackage
-            | CommandAction::CachePackage => Aggregate::Package,
-            
+
+            CommandAction::BuildPackage | CommandAction::CachePackage => Aggregate::Package,
+
             CommandAction::CreateModule
             | CommandAction::UpdateModule
             | CommandAction::DeleteModule => Aggregate::Module,
-            
+
             CommandAction::CreateOverlay
             | CommandAction::UpdateOverlay
             | CommandAction::DeleteOverlay => Aggregate::Overlay,
-            
+
             CommandAction::CreateConfiguration
             | CommandAction::UpdateConfiguration
             | CommandAction::ActivateConfiguration
@@ -145,21 +144,21 @@ pub enum EventAction {
     FlakeUpdated,
     FlakeInputAdded,
     FlakeInputRemoved,
-    
+
     // Package events
     PackageBuilt,
     PackageCached,
-    
+
     // Module events
     ModuleCreated,
     ModuleUpdated,
     ModuleDeleted,
-    
+
     // Overlay events
     OverlayCreated,
     OverlayUpdated,
     OverlayDeleted,
-    
+
     // Configuration events
     ConfigurationCreated,
     ConfigurationUpdated,
@@ -175,21 +174,21 @@ impl EventAction {
             EventAction::FlakeUpdated => "updated",
             EventAction::FlakeInputAdded => "input_added",
             EventAction::FlakeInputRemoved => "input_removed",
-            
+
             // Package events
             EventAction::PackageBuilt => "built",
             EventAction::PackageCached => "cached",
-            
+
             // Module events
             EventAction::ModuleCreated => "created",
             EventAction::ModuleUpdated => "updated",
             EventAction::ModuleDeleted => "deleted",
-            
+
             // Overlay events
             EventAction::OverlayCreated => "created",
             EventAction::OverlayUpdated => "updated",
             EventAction::OverlayDeleted => "deleted",
-            
+
             // Configuration events
             EventAction::ConfigurationCreated => "created",
             EventAction::ConfigurationUpdated => "updated",
@@ -197,25 +196,24 @@ impl EventAction {
             EventAction::ConfigurationRolledBack => "rolled_back",
         }
     }
-    
+
     pub fn aggregate(&self) -> Aggregate {
         match self {
             EventAction::FlakeCreated
             | EventAction::FlakeUpdated
             | EventAction::FlakeInputAdded
             | EventAction::FlakeInputRemoved => Aggregate::Flake,
-            
-            EventAction::PackageBuilt
-            | EventAction::PackageCached => Aggregate::Package,
-            
+
+            EventAction::PackageBuilt | EventAction::PackageCached => Aggregate::Package,
+
             EventAction::ModuleCreated
             | EventAction::ModuleUpdated
             | EventAction::ModuleDeleted => Aggregate::Module,
-            
+
             EventAction::OverlayCreated
             | EventAction::OverlayUpdated
             | EventAction::OverlayDeleted => Aggregate::Overlay,
-            
+
             EventAction::ConfigurationCreated
             | EventAction::ConfigurationUpdated
             | EventAction::ConfigurationActivated
@@ -231,20 +229,20 @@ pub enum QueryAction {
     GetFlake,
     ListFlakes,
     GetFlakeInputs,
-    
+
     // Package queries
     GetPackage,
     ListPackages,
     GetBuildStatus,
-    
+
     // Module queries
     GetModule,
     ListModules,
-    
+
     // Overlay queries
     GetOverlay,
     ListOverlays,
-    
+
     // Configuration queries
     GetConfiguration,
     ListConfigurations,
@@ -259,20 +257,20 @@ impl QueryAction {
             QueryAction::GetFlake => "get",
             QueryAction::ListFlakes => "list",
             QueryAction::GetFlakeInputs => "get_inputs",
-            
+
             // Package queries
             QueryAction::GetPackage => "get",
             QueryAction::ListPackages => "list",
             QueryAction::GetBuildStatus => "get_status",
-            
+
             // Module queries
             QueryAction::GetModule => "get",
             QueryAction::ListModules => "list",
-            
+
             // Overlay queries
             QueryAction::GetOverlay => "get",
             QueryAction::ListOverlays => "list",
-            
+
             // Configuration queries
             QueryAction::GetConfiguration => "get",
             QueryAction::ListConfigurations => "list",
@@ -280,23 +278,21 @@ impl QueryAction {
             QueryAction::GetConfigurationHistory => "get_history",
         }
     }
-    
+
     pub fn aggregate(&self) -> Aggregate {
         match self {
-            QueryAction::GetFlake
-            | QueryAction::ListFlakes
-            | QueryAction::GetFlakeInputs => Aggregate::Flake,
-            
-            QueryAction::GetPackage
-            | QueryAction::ListPackages
-            | QueryAction::GetBuildStatus => Aggregate::Package,
-            
-            QueryAction::GetModule
-            | QueryAction::ListModules => Aggregate::Module,
-            
-            QueryAction::GetOverlay
-            | QueryAction::ListOverlays => Aggregate::Overlay,
-            
+            QueryAction::GetFlake | QueryAction::ListFlakes | QueryAction::GetFlakeInputs => {
+                Aggregate::Flake
+            }
+
+            QueryAction::GetPackage | QueryAction::ListPackages | QueryAction::GetBuildStatus => {
+                Aggregate::Package
+            }
+
+            QueryAction::GetModule | QueryAction::ListModules => Aggregate::Module,
+
+            QueryAction::GetOverlay | QueryAction::ListOverlays => Aggregate::Overlay,
+
             QueryAction::GetConfiguration
             | QueryAction::ListConfigurations
             | QueryAction::GetCurrentConfiguration
@@ -322,7 +318,7 @@ impl NixSubject {
             action: action.as_str().to_string(),
         }
     }
-    
+
     /// Create an event subject
     pub fn event(action: EventAction) -> Self {
         Self {
@@ -331,7 +327,7 @@ impl NixSubject {
             action: action.as_str().to_string(),
         }
     }
-    
+
     /// Create a query subject
     pub fn query(action: QueryAction) -> Self {
         Self {
@@ -340,21 +336,21 @@ impl NixSubject {
             action: action.as_str().to_string(),
         }
     }
-    
+
     /// Parse a subject string into a NixSubject
     pub fn parse(subject: &str) -> Option<Self> {
         let parts: Vec<&str> = subject.split('.').collect();
         if parts.len() != 4 || parts[0] != DOMAIN {
             return None;
         }
-        
+
         let message_type = match parts[1] {
             "cmd" => MessageType::Command,
             "event" => MessageType::Event,
             "query" => MessageType::Query,
             _ => return None,
         };
-        
+
         let aggregate = match parts[2] {
             "flake" => Aggregate::Flake,
             "package" => Aggregate::Package,
@@ -363,7 +359,7 @@ impl NixSubject {
             "config" => Aggregate::Configuration,
             _ => return None,
         };
-        
+
         Some(Self {
             message_type,
             aggregate,
@@ -374,7 +370,11 @@ impl NixSubject {
 
 impl fmt::Display for NixSubject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{}.{}.{}", DOMAIN, self.message_type, self.aggregate, self.action)
+        write!(
+            f,
+            "{}.{}.{}.{}",
+            DOMAIN, self.message_type, self.aggregate, self.action
+        )
     }
 }
 
@@ -392,11 +392,13 @@ impl SubjectMapper {
             "CreateModule" => Some(NixSubject::command(CommandAction::CreateModule)),
             "CreateOverlay" => Some(NixSubject::command(CommandAction::CreateOverlay)),
             "CreateConfiguration" => Some(NixSubject::command(CommandAction::CreateConfiguration)),
-            "ActivateConfiguration" => Some(NixSubject::command(CommandAction::ActivateConfiguration)),
+            "ActivateConfiguration" => {
+                Some(NixSubject::command(CommandAction::ActivateConfiguration))
+            }
             _ => None,
         }
     }
-    
+
     /// Get the subject for an event
     pub fn event_subject(event_type: &str) -> Option<NixSubject> {
         match event_type {
@@ -407,11 +409,13 @@ impl SubjectMapper {
             "ModuleCreated" => Some(NixSubject::event(EventAction::ModuleCreated)),
             "OverlayCreated" => Some(NixSubject::event(EventAction::OverlayCreated)),
             "ConfigurationCreated" => Some(NixSubject::event(EventAction::ConfigurationCreated)),
-            "ConfigurationActivated" => Some(NixSubject::event(EventAction::ConfigurationActivated)),
+            "ConfigurationActivated" => {
+                Some(NixSubject::event(EventAction::ConfigurationActivated))
+            }
             _ => None,
         }
     }
-    
+
     /// Get all command subjects for subscription
     pub fn all_command_subjects() -> Vec<NixSubject> {
         vec![
@@ -433,7 +437,7 @@ impl SubjectMapper {
             NixSubject::command(CommandAction::RollbackConfiguration),
         ]
     }
-    
+
     /// Get all event subjects for subscription
     pub fn all_event_subjects() -> Vec<NixSubject> {
         vec![
@@ -460,69 +464,69 @@ impl SubjectMapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_command_subject_format() {
         let subject = NixSubject::command(CommandAction::CreateFlake);
         assert_eq!(subject.to_string(), "nix.cmd.flake.create");
-        
+
         let subject = NixSubject::command(CommandAction::BuildPackage);
         assert_eq!(subject.to_string(), "nix.cmd.package.build");
-        
+
         let subject = NixSubject::command(CommandAction::ActivateConfiguration);
         assert_eq!(subject.to_string(), "nix.cmd.config.activate");
     }
-    
+
     #[test]
     fn test_event_subject_format() {
         let subject = NixSubject::event(EventAction::FlakeCreated);
         assert_eq!(subject.to_string(), "nix.event.flake.created");
-        
+
         let subject = NixSubject::event(EventAction::PackageBuilt);
         assert_eq!(subject.to_string(), "nix.event.package.built");
-        
+
         let subject = NixSubject::event(EventAction::ConfigurationActivated);
         assert_eq!(subject.to_string(), "nix.event.config.activated");
     }
-    
+
     #[test]
     fn test_query_subject_format() {
         let subject = NixSubject::query(QueryAction::GetFlake);
         assert_eq!(subject.to_string(), "nix.query.flake.get");
-        
+
         let subject = NixSubject::query(QueryAction::ListPackages);
         assert_eq!(subject.to_string(), "nix.query.package.list");
-        
+
         let subject = NixSubject::query(QueryAction::GetCurrentConfiguration);
         assert_eq!(subject.to_string(), "nix.query.config.get_current");
     }
-    
+
     #[test]
     fn test_parse_subject() {
         let subject = NixSubject::parse("nix.cmd.flake.create").unwrap();
         assert_eq!(subject.message_type, MessageType::Command);
         assert_eq!(subject.aggregate, Aggregate::Flake);
         assert_eq!(subject.action, "create");
-        
+
         let subject = NixSubject::parse("nix.event.package.built").unwrap();
         assert_eq!(subject.message_type, MessageType::Event);
         assert_eq!(subject.aggregate, Aggregate::Package);
         assert_eq!(subject.action, "built");
-        
+
         // Invalid subjects
         assert!(NixSubject::parse("invalid.subject").is_none());
         assert!(NixSubject::parse("other.cmd.flake.create").is_none());
         assert!(NixSubject::parse("nix.invalid.flake.create").is_none());
     }
-    
+
     #[test]
     fn test_subject_mapper() {
         let subject = SubjectMapper::command_subject("CreateFlake").unwrap();
         assert_eq!(subject.to_string(), "nix.cmd.flake.create");
-        
+
         let subject = SubjectMapper::event_subject("FlakeCreated").unwrap();
         assert_eq!(subject.to_string(), "nix.event.flake.created");
-        
+
         assert!(SubjectMapper::command_subject("InvalidCommand").is_none());
     }
 }

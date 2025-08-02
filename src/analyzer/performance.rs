@@ -75,10 +75,7 @@ impl PerformanceAnalyzer {
         }
 
         // Sort by impact (highest first)
-        issues.sort_by(|a, b| {
-            b.impact.cmp(&a.impact)
-                .then_with(|| a.file.cmp(&b.file))
-        });
+        issues.sort_by(|a, b| b.impact.cmp(&a.impact).then_with(|| a.file.cmp(&b.file)));
 
         Ok(issues)
     }
@@ -108,7 +105,7 @@ impl PerformanceAnalyzer {
         // Look for import expressions
         if node.kind() == SyntaxKind::NODE_APPLY {
             let text = node.text().to_string();
-            
+
             // Check if this is an import call
             if text.contains("import") {
                 // Check if the import argument contains derivation-related functions
@@ -136,11 +133,15 @@ impl PerformanceAnalyzer {
                 issues.push(PerformanceIssue {
                     issue_type: PerformanceIssueType::ImportFromDerivation,
                     impact: ImpactLevel::High,
-                    description: "Import from derivation (IFD) forces evaluation during build".to_string(),
+                    description: "Import from derivation (IFD) forces evaluation during build"
+                        .to_string(),
                     file: file.as_ref().map(|p| p.display().to_string()),
                     line: None,
                     cost_estimate: Some("Can add minutes to evaluation time".to_string()),
-                    suggestion: Some("Pre-build and commit the imported file, or use a different approach".to_string()),
+                    suggestion: Some(
+                        "Pre-build and commit the imported file, or use a different approach"
+                            .to_string(),
+                    ),
                 });
             }
         }
@@ -162,7 +163,7 @@ impl PerformanceAnalyzer {
 
         // Count recursion depth
         let depth = Self::measure_recursion_depth(node);
-        
+
         if depth > 10 {
             let impact = if depth > 20 {
                 ImpactLevel::Critical
@@ -179,7 +180,9 @@ impl PerformanceAnalyzer {
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 cost_estimate: Some(format!("Exponential evaluation cost at depth {depth}")),
-                suggestion: Some("Consider using builtins.foldl' or iterative approaches".to_string()),
+                suggestion: Some(
+                    "Consider using builtins.foldl' or iterative approaches".to_string(),
+                ),
             });
         }
 
@@ -247,7 +250,7 @@ impl PerformanceAnalyzer {
 
         // Count string concatenations in a single expression
         let concat_count = Self::count_string_concatenations(node);
-        
+
         if concat_count > 5 {
             let impact = if concat_count > 20 {
                 ImpactLevel::High
@@ -264,7 +267,9 @@ impl PerformanceAnalyzer {
                 file: file.as_ref().map(|p| p.display().to_string()),
                 line: None,
                 cost_estimate: Some("O(n²) string building complexity".to_string()),
-                suggestion: Some("Use string interpolation or builtins.concatStringsSep".to_string()),
+                suggestion: Some(
+                    "Use string interpolation or builtins.concatStringsSep".to_string(),
+                ),
             });
         }
 
@@ -294,7 +299,9 @@ impl PerformanceAnalyzer {
                     file: file.as_ref().map(|p| p.display().to_string()),
                     line: None,
                     cost_estimate: Some("Evaluated on every function call".to_string()),
-                    suggestion: Some("Consider hoisting constant computations outside the function".to_string()),
+                    suggestion: Some(
+                        "Consider hoisting constant computations outside the function".to_string(),
+                    ),
                 });
             }
         }
@@ -330,7 +337,7 @@ impl PerformanceAnalyzer {
 
         // Count depth of attribute access
         let depth = Self::count_attribute_depth(node);
-        
+
         if depth > 5 {
             let impact = if depth > 10 {
                 ImpactLevel::Medium
@@ -360,12 +367,12 @@ impl PerformanceAnalyzer {
     /// Helper: Check if node contains a derivation
     fn contains_derivation(node: &SyntaxNode) -> bool {
         let text = node.text().to_string();
-        text.contains("mkDerivation") || 
-        text.contains("buildPackage") ||
-        text.contains("stdenv.mkDerivation") ||
-        text.contains("runCommand") ||
-        text.contains("writeText") ||
-        text.contains("writeFile")
+        text.contains("mkDerivation")
+            || text.contains("buildPackage")
+            || text.contains("stdenv.mkDerivation")
+            || text.contains("runCommand")
+            || text.contains("writeText")
+            || text.contains("writeFile")
     }
 
     /// Helper: Measure recursion depth
@@ -395,25 +402,26 @@ impl PerformanceAnalyzer {
 
     /// Helper: Count string concatenations
     fn count_string_concatenations(node: &SyntaxNode) -> usize {
-        node.text().to_string().matches(" + ").count() +
-        node.text().to_string().matches("++").count()
+        node.text().to_string().matches(" + ").count()
+            + node.text().to_string().matches("++").count()
     }
 
     /// Helper: Check if inside repeated context
     fn is_inside_repeated_context(node: &SyntaxNode) -> bool {
         // Walk up the tree to see if we're inside a map, filter, or similar
         let mut current = node.clone();
-        
+
         while let Some(parent) = current.parent() {
             let parent_text = parent.text().to_string();
-            if parent_text.contains("map ") || 
-               parent_text.contains("filter ") ||
-               parent_text.contains("fold") {
+            if parent_text.contains("map ")
+                || parent_text.contains("filter ")
+                || parent_text.contains("fold")
+            {
                 return true;
             }
             current = parent;
         }
-        
+
         false
     }
 
@@ -446,7 +454,8 @@ mod tests {
         let file = NixFile::parse_string(content.to_string(), None).unwrap();
         let issues = PerformanceAnalyzer::analyze(&[file]).unwrap();
 
-        let ifd_issues: Vec<_> = issues.iter()
+        let ifd_issues: Vec<_> = issues
+            .iter()
             .filter(|i| i.issue_type == PerformanceIssueType::ImportFromDerivation)
             .collect();
 
@@ -466,7 +475,9 @@ mod tests {
         let file = NixFile::parse_string(content.to_string(), None).unwrap();
         let issues = PerformanceAnalyzer::analyze(&[file]).unwrap();
 
-        assert!(issues.iter().any(|i| i.issue_type == PerformanceIssueType::LargeListOperation));
+        assert!(issues
+            .iter()
+            .any(|i| i.issue_type == PerformanceIssueType::LargeListOperation));
     }
 
     #[test]
@@ -480,10 +491,11 @@ mod tests {
         let file = NixFile::parse_string(content.to_string(), None).unwrap();
         let issues = PerformanceAnalyzer::analyze(&[file]).unwrap();
 
-        let deep_access: Vec<_> = issues.iter()
+        let deep_access: Vec<_> = issues
+            .iter()
             .filter(|i| i.issue_type == PerformanceIssueType::DeepAttributeAccess)
             .collect();
 
         assert!(!deep_access.is_empty());
     }
-} 
+}

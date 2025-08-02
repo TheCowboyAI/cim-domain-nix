@@ -1,16 +1,15 @@
 //! Home Manager configuration analyzer
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use super::{
-    HomeConfiguration, ProgramConfig, ServiceConfig,
-    HomeAnalysis, ProgramAnalysis, ServiceAnalysis, DotfileInfo,
-    ConflictInfo, ConflictType, Suggestion, SuggestionType,
-    Priority, ComplexityScore, SecurityScore, ResourceUsage,
+    ComplexityScore, ConflictInfo, ConflictType, DotfileInfo, HomeAnalysis, HomeConfiguration,
+    Priority, ProgramAnalysis, ProgramConfig, ResourceUsage, SecurityScore, ServiceAnalysis,
+    ServiceConfig, Suggestion, SuggestionType,
 };
-use crate::parser::{NixParser, ParsedFile, NixExpr};
+use crate::parser::{NixExpr, NixParser, ParsedFile};
 use crate::value_objects::NixValue;
 use crate::NixDomainError;
 
@@ -36,28 +35,34 @@ impl HomeManagerAnalyzer {
     }
 
     /// Analyze a Home Manager configuration file
-    pub async fn analyze_home_config(&mut self, path: &Path) -> Result<HomeAnalysis, NixDomainError> {
+    pub async fn analyze_home_config(
+        &mut self,
+        path: &Path,
+    ) -> Result<HomeAnalysis, NixDomainError> {
         // Check cache first
         let cache_key = path.to_string_lossy().to_string();
-        
+
         // If configuration is in cache and file hasn't been modified, use cached config
-        if let Some(cached_config) = self.config_cache.get(&cache_key) {
+        if let Some(_cached_config) = self.config_cache.get(&cache_key) {
             if let Ok(metadata) = fs::metadata(path) {
-                if let Ok(modified) = metadata.modified() {
+                if let Ok(_modified) = metadata.modified() {
                     // For now, always re-parse to ensure freshness
                     // In production, would check modification time
-                    tracing::debug!("Found cached config for {}, but re-parsing for freshness", cache_key);
+                    tracing::debug!(
+                        "Found cached config for {}, but re-parsing for freshness",
+                        cache_key
+                    );
                 }
             }
         }
-        
+
         let parsed = self.parser.parse_file(path)?;
         let config = self.extract_home_config(&parsed)?;
-        
+
         // Store in cache for future use
         self.config_cache.insert(cache_key.clone(), config.clone());
         tracing::debug!("Cached configuration for {}", cache_key);
-        
+
         let analysis = HomeAnalysis {
             programs: self.analyze_programs(&config)?,
             services: self.analyze_services(&config)?,
@@ -65,14 +70,17 @@ impl HomeManagerAnalyzer {
             conflicts: self.detect_conflicts(&config)?,
             suggestions: self.generate_suggestions(&config)?,
         };
-        
+
         Ok(analysis)
     }
 
     /// Extract Home Manager configuration from a parsed Nix file
-    pub fn extract_home_config(&self, parsed: &ParsedFile) -> Result<HomeConfiguration, NixDomainError> {
+    pub fn extract_home_config(
+        &self,
+        parsed: &ParsedFile,
+    ) -> Result<HomeConfiguration, NixDomainError> {
         let mut config = HomeConfiguration::new();
-        
+
         // Extract programs configuration
         if let Some(programs) = self.find_attribute_path(&parsed.expr, &["programs"]) {
             if let NixExpr::AttrSet(attrs) = programs {
@@ -83,7 +91,7 @@ impl HomeManagerAnalyzer {
                 }
             }
         }
-        
+
         // Extract services configuration
         if let Some(services) = self.find_attribute_path(&parsed.expr, &["services"]) {
             if let NixExpr::AttrSet(attrs) = services {
@@ -94,7 +102,7 @@ impl HomeManagerAnalyzer {
                 }
             }
         }
-        
+
         // Extract home.packages
         if let Some(packages) = self.find_attribute_path(&parsed.expr, &["home", "packages"]) {
             if let NixExpr::List(items) = packages {
@@ -105,7 +113,7 @@ impl HomeManagerAnalyzer {
                 }
             }
         }
-        
+
         // Extract home.file mappings
         if let Some(files) = self.find_attribute_path(&parsed.expr, &["home", "file"]) {
             if let NixExpr::AttrSet(attrs) = files {
@@ -116,19 +124,19 @@ impl HomeManagerAnalyzer {
                 }
             }
         }
-        
+
         Ok(config)
     }
 
     fn extract_program_config(&self, expr: &NixExpr) -> Result<ProgramConfig, NixDomainError> {
         let mut config = ProgramConfig::new(false);
-        
+
         if let NixExpr::AttrSet(attrs) = expr {
             // Check if enabled
             if let Some(NixExpr::Bool(enabled)) = attrs.get("enable") {
                 config.enabled = *enabled;
             }
-            
+
             // Extract settings
             if let Some(NixExpr::AttrSet(settings)) = attrs.get("settings") {
                 for (key, value) in settings {
@@ -137,25 +145,25 @@ impl HomeManagerAnalyzer {
                     }
                 }
             }
-            
+
             // Extract extraConfig
             if let Some(NixExpr::String(extra)) = attrs.get("extraConfig") {
                 config.extra_config = Some(extra.clone());
             }
         }
-        
+
         Ok(config)
     }
 
     fn extract_service_config(&self, expr: &NixExpr) -> Result<ServiceConfig, NixDomainError> {
         let mut enabled = false;
         let mut settings = HashMap::new();
-        
+
         if let NixExpr::AttrSet(attrs) = expr {
             if let Some(NixExpr::Bool(e)) = attrs.get("enable") {
                 enabled = *e;
             }
-            
+
             for (key, value) in attrs {
                 if key != "enable" {
                     if let Ok(nix_value) = self.expr_to_value(value) {
@@ -164,7 +172,7 @@ impl HomeManagerAnalyzer {
                 }
             }
         }
-        
+
         Ok(ServiceConfig { enabled, settings })
     }
 
@@ -177,14 +185,19 @@ impl HomeManagerAnalyzer {
                 return Ok(path.clone());
             }
         }
-        
-        Err(NixDomainError::ParseError("Unable to extract file source".to_string()))
+
+        Err(NixDomainError::ParseError(
+            "Unable to extract file source".to_string(),
+        ))
     }
 
     /// Analyze configured programs for dependencies, complexity, and security
-    pub fn analyze_programs(&self, config: &HomeConfiguration) -> Result<Vec<ProgramAnalysis>, NixDomainError> {
+    pub fn analyze_programs(
+        &self,
+        config: &HomeConfiguration,
+    ) -> Result<Vec<ProgramAnalysis>, NixDomainError> {
         let mut analyses = Vec::new();
-        
+
         for (name, program_config) in &config.programs {
             let analysis = ProgramAnalysis {
                 name: name.clone(),
@@ -195,14 +208,17 @@ impl HomeManagerAnalyzer {
             };
             analyses.push(analysis);
         }
-        
+
         Ok(analyses)
     }
 
     /// Analyze configured services for resource usage
-    pub fn analyze_services(&self, config: &HomeConfiguration) -> Result<Vec<ServiceAnalysis>, NixDomainError> {
+    pub fn analyze_services(
+        &self,
+        config: &HomeConfiguration,
+    ) -> Result<Vec<ServiceAnalysis>, NixDomainError> {
         let mut analyses = Vec::new();
-        
+
         for (name, service_config) in &config.services {
             let analysis = ServiceAnalysis {
                 name: name.clone(),
@@ -211,14 +227,17 @@ impl HomeManagerAnalyzer {
             };
             analyses.push(analysis);
         }
-        
+
         Ok(analyses)
     }
 
     /// Find and analyze dotfile mappings in the configuration
-    pub fn find_dotfile_mappings(&self, config: &HomeConfiguration) -> Result<Vec<DotfileInfo>, NixDomainError> {
+    pub fn find_dotfile_mappings(
+        &self,
+        config: &HomeConfiguration,
+    ) -> Result<Vec<DotfileInfo>, NixDomainError> {
         let mut dotfiles = Vec::new();
-        
+
         for mapping in &config.file_mappings {
             if let Ok(metadata) = fs::metadata(&mapping.source) {
                 let info = DotfileInfo {
@@ -230,23 +249,24 @@ impl HomeManagerAnalyzer {
                 dotfiles.push(info);
             }
         }
-        
+
         Ok(dotfiles)
     }
 
     /// Detect configuration conflicts and inconsistencies
-    pub fn detect_conflicts(&self, config: &HomeConfiguration) -> Result<Vec<ConflictInfo>, NixDomainError> {
+    pub fn detect_conflicts(
+        &self,
+        config: &HomeConfiguration,
+    ) -> Result<Vec<ConflictInfo>, NixDomainError> {
         let mut conflicts = Vec::new();
-        
+
         // Check for conflicting shell configurations
         let shells = ["bash", "zsh", "fish"];
-        let enabled_shells: Vec<_> = shells.iter()
-            .filter(|&&shell| {
-                config.programs.get(shell)
-                    .is_some_and(|p| p.enabled)
-            })
+        let enabled_shells: Vec<_> = shells
+            .iter()
+            .filter(|&&shell| config.programs.get(shell).is_some_and(|p| p.enabled))
             .collect();
-        
+
         if enabled_shells.len() > 1 {
             conflicts.push(ConflictInfo {
                 conflict_type: ConflictType::ConflictingSettings,
@@ -254,7 +274,7 @@ impl HomeManagerAnalyzer {
                 affected_items: enabled_shells.iter().map(|s| (**s).to_string()).collect(),
             });
         }
-        
+
         // Check for missing dependencies
         for (name, program) in &config.programs {
             if program.enabled {
@@ -270,14 +290,17 @@ impl HomeManagerAnalyzer {
                 }
             }
         }
-        
+
         Ok(conflicts)
     }
 
     /// Generate suggestions for improving the configuration
-    pub fn generate_suggestions(&self, config: &HomeConfiguration) -> Result<Vec<Suggestion>, NixDomainError> {
+    pub fn generate_suggestions(
+        &self,
+        config: &HomeConfiguration,
+    ) -> Result<Vec<Suggestion>, NixDomainError> {
         let mut suggestions = Vec::new();
-        
+
         // Suggest enabling useful programs
         let useful_programs = ["direnv", "starship", "fzf", "ripgrep"];
         for program in useful_programs {
@@ -289,7 +312,7 @@ impl HomeManagerAnalyzer {
                 });
             }
         }
-        
+
         // Check for security improvements
         if let Some(git) = config.programs.get("git") {
             if git.enabled && !git.settings.contains_key("signing") {
@@ -300,7 +323,7 @@ impl HomeManagerAnalyzer {
                 });
             }
         }
-        
+
         // Check for unused programs
         for (name, program) in &config.programs {
             if !program.enabled && !program.settings.is_empty() {
@@ -311,22 +334,26 @@ impl HomeManagerAnalyzer {
                 });
             }
         }
-        
+
         Ok(suggestions)
     }
 
     /// Migrate existing dotfiles to a Home Manager configuration
-    pub fn migrate_from_dotfiles(&self, dotfiles_dir: &Path) -> Result<HomeConfiguration, NixDomainError> {
+    pub fn migrate_from_dotfiles(
+        &self,
+        dotfiles_dir: &Path,
+    ) -> Result<HomeConfiguration, NixDomainError> {
         let mut config = HomeConfiguration::new();
-        
+
         // Scan for common dotfiles
         let entries = fs::read_dir(dotfiles_dir)
             .map_err(|e| NixDomainError::ParseError(format!("Failed to read directory: {e}")))?;
-        
+
         for entry in entries {
-            let entry = entry.map_err(|e| NixDomainError::ParseError(format!("Failed to read entry: {e}")))?;
+            let entry = entry
+                .map_err(|e| NixDomainError::ParseError(format!("Failed to read entry: {e}")))?;
             let path = entry.path();
-            
+
             if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
                 match file_name {
                     ".gitconfig" | "gitconfig" => {
@@ -355,14 +382,14 @@ impl HomeManagerAnalyzer {
                 }
             }
         }
-        
+
         Ok(config)
     }
 
     // Helper methods
     fn find_attribute_path<'a>(&self, expr: &'a NixExpr, path: &[&str]) -> Option<&'a NixExpr> {
         let mut current = expr;
-        
+
         for segment in path {
             if let NixExpr::AttrSet(attrs) = current {
                 current = attrs.get(*segment)?;
@@ -370,7 +397,7 @@ impl HomeManagerAnalyzer {
                 return None;
             }
         }
-        
+
         Some(current)
     }
 
@@ -382,16 +409,21 @@ impl HomeManagerAnalyzer {
             NixExpr::Bool(b) => Ok(NixValue::Bool(*b)),
             NixExpr::Path(p) => Ok(NixValue::Path(p.clone())),
             NixExpr::List(items) => {
-                let values: Result<Vec<_>, _> = items.iter()
-                    .map(|e| self.expr_to_value(e))
-                    .collect();
+                let values: Result<Vec<_>, _> =
+                    items.iter().map(|e| self.expr_to_value(e)).collect();
                 Ok(NixValue::List(values?))
             }
-            _ => Err(NixDomainError::ParseError("Unsupported expression type".to_string())),
+            _ => Err(NixDomainError::ParseError(
+                "Unsupported expression type".to_string(),
+            )),
         }
     }
 
-    fn find_program_dependencies(&self, name: &str, _config: &ProgramConfig) -> Result<Vec<String>, NixDomainError> {
+    fn find_program_dependencies(
+        &self,
+        name: &str,
+        _config: &ProgramConfig,
+    ) -> Result<Vec<String>, NixDomainError> {
         // Common program dependencies
         let deps = match name {
             "neovim" => vec!["ripgrep", "fd"],
@@ -400,27 +432,31 @@ impl HomeManagerAnalyzer {
             "starship" => vec!["git"],
             _ => vec![],
         };
-        
+
         Ok(deps.into_iter().map(String::from).collect())
     }
 
     fn calculate_complexity(&self, config: &ProgramConfig) -> ComplexityScore {
         let mut score = 0;
-        
+
         // Base complexity from number of settings
         score += config.settings.len() as u32;
-        
+
         // Extra complexity for custom config
         if config.extra_config.is_some() {
             score += 10;
         }
-        
+
         ComplexityScore(score)
     }
 
-    fn assess_security(&self, name: &str, config: &ProgramConfig) -> Result<SecurityScore, NixDomainError> {
+    fn assess_security(
+        &self,
+        name: &str,
+        config: &ProgramConfig,
+    ) -> Result<SecurityScore, NixDomainError> {
         let mut score = 100;
-        
+
         // Program-specific security checks
         match name {
             "ssh" => {
@@ -435,7 +471,7 @@ impl HomeManagerAnalyzer {
             }
             _ => {}
         }
-        
+
         Ok(SecurityScore(score))
     }
 
@@ -459,7 +495,7 @@ impl HomeManagerAnalyzer {
 
     fn identify_program_from_path(&self, path: &Path) -> Option<String> {
         let file_name = path.file_name()?.to_str()?;
-        
+
         match file_name {
             ".gitconfig" | "gitconfig" => Some("git".to_string()),
             ".vimrc" | "vimrc" | ".vim" => Some("vim".to_string()),
@@ -469,18 +505,18 @@ impl HomeManagerAnalyzer {
             _ => None,
         }
     }
-    
+
     /// Clear the configuration cache
     pub fn clear_cache(&mut self) {
         self.config_cache.clear();
         tracing::debug!("Cleared configuration cache");
     }
-    
+
     /// Get the size of the configuration cache
     pub fn cache_size(&self) -> usize {
         self.config_cache.len()
     }
-    
+
     /// Remove a specific configuration from cache
     pub fn invalidate_cache(&mut self, path: &Path) {
         let cache_key = path.to_string_lossy().to_string();
@@ -488,4 +524,4 @@ impl HomeManagerAnalyzer {
             tracing::debug!("Invalidated cache for {}", cache_key);
         }
     }
-} 
+}

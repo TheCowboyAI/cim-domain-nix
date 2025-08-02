@@ -1,10 +1,16 @@
 //! Read models and projections for the Nix domain
 
-use crate::{events::{FlakeCreated, FlakeInputAdded, PackageBuilt, ActivationType, ConfigurationCreated, ConfigurationActivated, NixDomainEvent}, value_objects::{FlakeRef, FlakeOutputs, AttributePath}};
+use crate::{
+    events::{
+        ActivationType, ConfigurationActivated, ConfigurationCreated, FlakeCreated,
+        FlakeInputAdded, NixDomainEvent, PackageBuilt,
+    },
+    value_objects::{AttributePath, FlakeOutputs, FlakeRef},
+};
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 /// Information about a flake
 #[derive(Debug, Clone)]
@@ -56,7 +62,8 @@ impl FlakeProjection {
         };
 
         self.flakes.insert(event.flake_id, info);
-        self.flakes_by_path.insert(event.path.clone(), event.flake_id);
+        self.flakes_by_path
+            .insert(event.path.clone(), event.flake_id);
     }
 
     /// Handle a flake input added event
@@ -124,7 +131,7 @@ impl PackageBuildProjection {
     /// Handle a package built event
     pub fn handle_package_built(&mut self, event: &PackageBuilt) {
         let key = format!("x86_64-linux#{}", event.attribute);
-        
+
         let package_info = PackageInfo {
             name: event.attribute.to_string(),
             system: "x86_64-linux".to_string(),
@@ -149,10 +156,7 @@ impl PackageBuildProjection {
         self.successful_builds += 1;
 
         // Update average build time
-        let total_time: std::time::Duration = self.builds
-            .iter()
-            .map(|b| b.build_time)
-            .sum();
+        let total_time: std::time::Duration = self.builds.iter().map(|b| b.build_time).sum();
         self.average_build_time = total_time / self.total_builds as u32;
     }
 }
@@ -200,8 +204,10 @@ impl ConfigurationProjection {
             activation_history: vec![],
         };
 
-        self.configurations.insert(event.configuration.name.clone(), info);
-        self.configurations_by_id.insert(event.configuration.id, event.configuration.name.clone());
+        self.configurations
+            .insert(event.configuration.name.clone(), info);
+        self.configurations_by_id
+            .insert(event.configuration.id, event.configuration.name.clone());
     }
 
     /// Handle a configuration activated event
@@ -278,4 +284,4 @@ pub struct ConfigurationView {
     pub system: String,
     /// Current generation number
     pub current_generation: Option<u64>,
-} 
+}

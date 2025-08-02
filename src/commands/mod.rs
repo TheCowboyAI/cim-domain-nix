@@ -1,26 +1,29 @@
 //! Commands for Nix domain operations
 
+use crate::aggregate::FlakeAggregate;
+use crate::events::ActivationType;
+use crate::value_objects::{
+    AttributePath, MessageIdentity, NixModule, NixOSConfiguration, Overlay,
+};
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::path::PathBuf;
 use uuid::Uuid;
-use crate::value_objects::{AttributePath, NixModule, Overlay, NixOSConfiguration, MessageIdentity};
-use crate::events::ActivationType;
-use crate::aggregate::FlakeAggregate;
 
 /// Trait for all Nix commands
 pub trait NixCommand: Send + Sync {
     /// Get the command ID
     fn command_id(&self) -> Uuid;
-    
+
     /// Get the message identity for correlation/causation
     fn identity(&self) -> &MessageIdentity;
-    
+
     /// Get the command as Any for downcasting
     fn as_any(&self) -> &dyn Any;
 }
 
 /// Command to create a new flake
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateFlake {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -36,11 +39,11 @@ impl NixCommand for CreateFlake {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -55,7 +58,7 @@ impl cim_domain::Command for CreateFlake {
 }
 
 /// Command to update a flake
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateFlake {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -67,11 +70,11 @@ impl NixCommand for UpdateFlake {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -86,7 +89,7 @@ impl cim_domain::Command for UpdateFlake {
 }
 
 /// Command to add an input to a flake
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddFlakeInput {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -102,11 +105,11 @@ impl NixCommand for AddFlakeInput {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -121,7 +124,7 @@ impl cim_domain::Command for AddFlakeInput {
 }
 
 /// Command to build a package
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildPackage {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -137,11 +140,11 @@ impl NixCommand for BuildPackage {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -156,7 +159,7 @@ impl cim_domain::Command for BuildPackage {
 }
 
 /// Command to create a module
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateModule {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -170,11 +173,11 @@ impl NixCommand for CreateModule {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -189,7 +192,7 @@ impl cim_domain::Command for CreateModule {
 }
 
 /// Command to create an overlay
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateOverlay {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -203,11 +206,11 @@ impl NixCommand for CreateOverlay {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -222,7 +225,7 @@ impl cim_domain::Command for CreateOverlay {
 }
 
 /// Command to create a configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateConfiguration {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -236,11 +239,11 @@ impl NixCommand for CreateConfiguration {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -255,7 +258,7 @@ impl cim_domain::Command for CreateConfiguration {
 }
 
 /// Command to activate a configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivateConfiguration {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -269,11 +272,11 @@ impl NixCommand for ActivateConfiguration {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -288,7 +291,7 @@ impl cim_domain::Command for ActivateConfiguration {
 }
 
 /// Command to evaluate a Nix expression
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluateExpression {
     /// Message identity for correlation/causation
     pub identity: MessageIdentity,
@@ -300,11 +303,11 @@ impl NixCommand for EvaluateExpression {
     fn command_id(&self) -> Uuid {
         self.identity.message_id.0
     }
-    
+
     fn identity(&self) -> &MessageIdentity {
         &self.identity
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -319,17 +322,23 @@ impl cim_domain::Command for EvaluateExpression {
 }
 
 /// Command to run garbage collection
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunGarbageCollection {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Optional: only collect items older than this many days
     pub older_than_days: Option<u32>,
 }
 
 impl NixCommand for RunGarbageCollection {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
     }
-    
+
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -344,17 +353,23 @@ impl cim_domain::Command for RunGarbageCollection {
 }
 
 /// Command to check a flake
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckFlake {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Path to the flake to check
     pub path: PathBuf,
 }
 
 impl NixCommand for CheckFlake {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
     }
-    
+
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -369,8 +384,10 @@ impl cim_domain::Command for CheckFlake {
 }
 
 /// Command to enter a development shell
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DevelopFlake {
+    /// Message identity for correlation/causation
+    pub identity: MessageIdentity,
     /// Path to the flake with devShell
     pub path: PathBuf,
     /// Optional command to run in the shell
@@ -379,9 +396,13 @@ pub struct DevelopFlake {
 
 impl NixCommand for DevelopFlake {
     fn command_id(&self) -> Uuid {
-        Uuid::new_v4()
+        self.identity.message_id.0
     }
-    
+
+    fn identity(&self) -> &MessageIdentity {
+        &self.identity
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -393,4 +414,4 @@ impl cim_domain::Command for DevelopFlake {
     fn aggregate_id(&self) -> Option<cim_domain::EntityId<Self::Aggregate>> {
         None // Develop is an interactive operation
     }
-} 
+}
