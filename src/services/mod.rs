@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Domain services for Nix operations
 
 use crate::commands::{AddFlakeInput, CreateFlake};

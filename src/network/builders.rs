@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! System builders for network-based NixOS configurations
 
 use super::{

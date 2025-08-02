@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Commands for Nix domain operations
 
 use crate::aggregate::FlakeAggregate;

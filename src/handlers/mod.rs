@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Command and event handlers for the Nix domain
 //!
 //! This module will contain handlers that process commands

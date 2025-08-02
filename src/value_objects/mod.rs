@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Value objects for the Nix domain
 //!
 //! This module contains immutable value objects that represent

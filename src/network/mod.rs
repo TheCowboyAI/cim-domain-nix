@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Network integration for building NixOS systems from network events
 //!
 //! This module handles events from nix-network domain to automatically

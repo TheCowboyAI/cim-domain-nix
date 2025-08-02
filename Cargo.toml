@@ -2,12 +2,25 @@
 name = "cim-domain-nix"
 version = "0.3.0"
 edition = "2021"
-authors = ["The Cowboy AI Team"]
-description = "Domain module for Nix ecosystem operations including flakes, modules, overlays, and configurations"
+authors = ["Cowboy AI, LLC <dev@thecowboy.ai>"]
+description = "Domain-Driven Design module for comprehensive Nix ecosystem integration within CIM"
+documentation = "https://docs.rs/cim-domain-nix"
+homepage = "https://github.com/thecowboyai/cim-domain-nix"
+repository = "https://github.com/thecowboyai/cim-domain-nix"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/thecowboyai/alchemist"
-keywords = ["nix", "nixos", "flakes", "domain-driven-design", "cim"]
-categories = ["development-tools", "config"]
+readme = "README.md"
+keywords = ["domain", "cim", "event-sourcing", "ddd", "nix"]
+categories = ["development-tools", "data-structures"]
+exclude = [
+    ".github/",
+    "tests/",
+    "examples/",
+    "benches/",
+    ".gitignore",
+    ".git/",
+    "*.log",
+    "target/",
+]
 
 [dependencies]
 # Core dependencies

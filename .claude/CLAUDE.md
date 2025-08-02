@@ -1,12 +1,12 @@
-# CIM Development Assistant Instructions
+# CIM Domain Nix - Development Assistant Instructions
 
-## IMPORTANT: Context Awareness
-**Check which repository you're in:**
-- If in `cim` → You're in the REGISTRY (source of truth, not an implementation)
-- If in `cim-*` → You're in a MODULE (provides specific functionality)
-- If in `cim-domain-*` → You're in a DOMAIN (assembles modules for business)
+## Repository: cim-domain-nix
+**Type**: DOMAIN MODULE
+**Purpose**: Comprehensive Nix ecosystem integration for CIM architecture
+**Status**: 97% complete, production-ready
 
-Run `.claude/scripts/detect-context.sh` to understand your current context.
+## Overview
+This is the Nix Domain module within the CIM (Composable Information Machine) ecosystem. It provides event-driven integration with the Nix package manager, NixOS configurations, and network topology to system generation.
 
 ## CRITICAL: Date Handling Rules
 **NEVER generate dates from memory. ALWAYS use:**

@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Domain-Driven Design module for Nix ecosystem operations
 //!
 //! This module provides comprehensive support for working with the Nix package manager

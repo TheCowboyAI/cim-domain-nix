@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Network event handling
 
 use super::{NetworkTopologyEvent, NetworkEvent, InterfaceChangeEvent};

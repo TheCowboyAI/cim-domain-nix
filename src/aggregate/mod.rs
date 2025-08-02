@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Aggregates for the Nix domain
 //!
 //! This module contains aggregate roots that maintain consistency

@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Handlers for network-related system operations
 
 use super::InterfaceChangeEvent;

@@ -1,3 +1,5 @@
+// Copyright 2025 Cowboy AI, LLC.
+
 //! Domain events for the Nix domain
 //!
 //! This module contains events that represent state changes
