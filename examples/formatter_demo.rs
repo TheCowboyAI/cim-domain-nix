@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
             "nixfmt" => Some(NixFormatter::NixFmt),
             "nixfmt-rfc" => Some(NixFormatter::NixFmtRfc),
             _ => {
-                eprintln!("Unknown formatter: {name}");
+                eprintln!("Unknown formatter: {}", name);
                 eprintln!("Available formatters: nixpkgs-fmt, alejandra, nixfmt, nixfmt-rfc");
                 return Ok(());
             }
@@ -89,26 +89,26 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Print report
-    println!("{report.summary(}"));
+    println!("{}", report.summary());
     
     if !report.formatted_files.is_empty() {
         println!("\n✅ Formatted files:");
         for file in &report.formatted_files {
-            println!("  - {file}");
+            println!("  - {}", file);
         }
     }
     
     if !report.needs_formatting.is_empty() {
         println!("\n⚠️  Files need formatting:");
         for file in &report.needs_formatting {
-            println!("  - {file}");
+            println!("  - {}", file);
         }
     }
     
     if !report.errors.is_empty() {
         println!("\n❌ Errors:");
         for (file, error) in &report.errors {
-            println!("  - {file}: {error}");
+            println!("  - {}: {}", file, error);
         }
     }
 

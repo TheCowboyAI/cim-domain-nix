@@ -137,34 +137,35 @@ bind - split-window -v
         Ok(analysis) => {
             println!("\n   Programs configured:");
             for program in &analysis.programs {
-                println!("   - {program.name} (enabled: {program.enabled}, complexity: {:?}, security: {:?})", program.configuration_complexity, program.security_score);
+                println!("   - {} (enabled: {}, complexity: {:?}, security: {:?})", 
+                    program.name, program.enabled, program.configuration_complexity, program.security_score);
                 if !program.dependencies.is_empty() {
-                    println!("     Dependencies: {program.dependencies.join(", "}"));
+                    println!("     Dependencies: {}", program.dependencies.join(", "));
                 }
             }
             
             println!("\n   Services configured:");
             for service in &analysis.services {
-                println!("   - {service.name} (enabled: {service.enabled})");
+                println!("   - {} (enabled: {})", service.name, service.enabled);
             }
             
             if !analysis.conflicts.is_empty() {
                 println!("\n   ⚠️  Conflicts detected:");
                 for conflict in &analysis.conflicts {
-                    println!("   - {:?}: {conflict.conflict_type}", conflict.description);
-                    println!("     Affected: {conflict.affected_items.join(", "}"));
+                    println!("   - {:?}: {}", conflict.conflict_type, conflict.description);
+                    println!("     Affected: {}", conflict.affected_items.join(", "));
                 }
             }
             
             if !analysis.suggestions.is_empty() {
                 println!("\n   💡 Suggestions:");
                 for suggestion in &analysis.suggestions {
-                    println!("   - [{:?}] {suggestion.priority}", suggestion.description);
+                    println!("   - [{:?}] {}", suggestion.priority, suggestion.description);
                 }
             }
         }
         Err(e) => {
-            println!("   Error analyzing config: {e}");
+            println!("   Error analyzing config: {}", e);
         }
     }
 
@@ -179,15 +180,15 @@ bind - split-window -v
             if file_name.starts_with('.') && !file_name.ends_with(".nix") {
                 match converter.auto_convert(&path) {
                     Ok((program, config)) => {
-                        println!("\n   ✅ Converted {file_name}: {program}");
-                        println!("      Enabled: {config.enabled}");
-                        println!("      Settings: {config.settings.len(} keys"));
+                        println!("\n   ✅ Converted {}: {}", file_name, program);
+                        println!("      Enabled: {}", config.enabled);
+                        println!("      Settings: {} keys", config.settings.len());
                         if config.extra_config.is_some() {
                             println!("      Has extra config");
                         }
                     }
                     Err(e) => {
-                        println!("\n   ❌ Failed to convert {file_name}: {e}");
+                        println!("\n   ❌ Failed to convert {}: {}", file_name, e);
                     }
                 }
             }
@@ -198,20 +199,20 @@ bind - split-window -v
     match analyzer.migrate_from_dotfiles(dotfiles_dir) {
         Ok(home_config) => {
             println!("\n   Migration successful!");
-            println!("   - Programs: {home_config.programs.len(}"));
-            println!("   - Services: {home_config.services.len(}"));
-            println!("   - File mappings: {home_config.file_mappings.len(}"));
-            println!("   - Home packages: {home_config.home_packages.len(}"));
+            println!("   - Programs: {}", home_config.programs.len());
+            println!("   - Services: {}", home_config.services.len());
+            println!("   - File mappings: {}", home_config.file_mappings.len());
+            println!("   - Home packages: {}", home_config.home_packages.len());
             
             println!("\n   Generated Home Manager configuration:");
             println!("   programs = {{");
             for (name, config) in &home_config.programs {
-                println!("     {name} = {{ enable = {config.enabled}; }};");
+                println!("     {} = {{ enable = {}; }};", name, config.enabled);
             }
             println!("   }};");
         }
         Err(e) => {
-            println!("   Migration failed: {e}");
+            println!("   Migration failed: {}", e);
         }
     }
 
@@ -232,7 +233,7 @@ bind - split-window -v
     println!("\n5. Supported programs:");
     let supported = converter.supported_programs();
     for program in supported {
-        println!("   - {program}");
+        println!("   - {}", program);
     }
 
     println!("\n=== Demo completed successfully! ===");
