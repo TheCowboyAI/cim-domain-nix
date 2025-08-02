@@ -66,7 +66,7 @@ async fn demo_development_service(factory: &NixServiceFactory) -> Result<(), Box
 
     // Keep the directory for inspection
     let path = temp_dir.into_path();
-    println!("\n   📁 Project created at: {path.display(}"));
+    println!("\n   📁 Project created at: {}", path.display());
 
     Ok(())
 }
@@ -81,7 +81,7 @@ async fn demo_package_service(factory: &NixServiceFactory) -> Result<(), Box<dyn
     println!("\n1. Searching for 'hello' packages...");
     match pkg_service.search_packages("hello".to_string(), Some(5)).await {
         Ok(results) => {
-            println!("   ✓ Found {results.len(} packages:"));
+            println!("   ✓ Found {} packages:", results.len());
             for (i, pkg) in results.iter().enumerate() {
                 println!("     {i + 1}. {pkg.name} - {pkg.description.as_deref(}").unwrap_or("No description")
                 );
@@ -99,7 +99,7 @@ async fn demo_package_service(factory: &NixServiceFactory) -> Result<(), Box<dyn
 
     match pkg_service.build_package("hello", Some(output_path.clone())).await {
         Ok(path) => {
-            println!("   ✓ Package built at: {path.display(}"));
+            println!("   ✓ Package built at: {}", path.display());
         }
         Err(e) => {
             println!("   ⚠ Build failed (nix might not be available): {e}");

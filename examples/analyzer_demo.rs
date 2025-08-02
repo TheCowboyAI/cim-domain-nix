@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     // Create analyzer
     let mut analyzer = NixAnalyzer::with_config(config);
 
-    println!("Analyzing Nix files in: {repo_path.display(}"));
+    println!("Analyzing Nix files in: {}", repo_path.display());
     if check_formatting {
         println!("Formatting check enabled");
     }

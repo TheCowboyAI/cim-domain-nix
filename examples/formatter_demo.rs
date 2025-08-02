@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     println!("Using formatter: {:?}", formatter.command());
-    println!("Target: {path.display(}"));
+    println!("Target: {}", path.display());
     if check_only {
         println!("Mode: Check only (no files will be modified)");
     } else {

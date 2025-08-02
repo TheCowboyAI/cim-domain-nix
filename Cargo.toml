@@ -119,3 +119,7 @@ path = "examples/nats_ecs_demo.rs"
 [[example]]
 name = "distributed_ecs_demo"
 path = "examples/distributed_ecs_demo.rs"
+
+[[example]]
+name = "network_integration_demo"
+path = "examples/network_integration_demo.rs"

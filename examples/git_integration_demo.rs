@@ -20,19 +20,19 @@ async fn main() -> anyhow::Result<()> {
 
     // Check if this is a Git repository
     if !repo_path.join(".git").exists() {
-        eprintln!("❌ Not a Git repository: {repo_path.display(}"));
+        eprintln!("❌ Not a Git repository: {}", repo_path.display());
         eprintln!("   Please run this from a Git repository with a flake.lock file");
         return Ok(());
     }
 
     // Check if flake.lock exists
     if !repo_path.join("flake.lock").exists() {
-        eprintln!("❌ No flake.lock found in: {repo_path.display(}"));
+        eprintln!("❌ No flake.lock found in: {}", repo_path.display());
         eprintln!("   This demo requires a Nix flake with a flake.lock file");
         return Ok(());
     }
 
-    println!("📂 Analyzing repository: {repo_path.display(}\n"));
+    println!("📂 Analyzing repository: {}\n", repo_path.display());
 
     // Create analyzer
     let analyzer = GitNixAnalyzer::new();
