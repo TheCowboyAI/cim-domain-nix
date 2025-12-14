@@ -31,7 +31,7 @@ serde_json = "1.0"
 tokio = { version = "1.40", features = ["full"] }
 async-trait = "0.1"
 tracing = "0.1"
-uuid = { version = "1.11", features = ["v4", "v5", "serde"] }
+uuid = { version = "1.11", features = ["v4", "v5", "v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # NATS dependencies
@@ -41,9 +41,12 @@ tokio-stream = "0.1"
 bytes = "1.5"
 
 # Domain dependencies
-cim-domain = { git = "https://github.com/TheCowboyAI/cim-domain.git", branch = "main" }
-cim-subject = { git = "https://github.com/TheCowboyAI/cim-subject.git", branch = "main" }
-cim-domain-git = { git = "https://github.com/TheCowboyAI/cim-domain-git.git", tag = "v0.5.0" }
+cim-domain-infrastructure = { path = "../cim-domain-infrastructure" }
+
+# Temporarily disabled - Will re-enable when we need them for adapters
+# cim-domain = { git = "ssh://git@github.com/TheCowboyAI/cim-domain.git", branch = "main" }
+# cim-domain-git = { git = "ssh://git@github.com/TheCowboyAI/cim-domain-git.git", tag = "v0.8.1" }
+# Note: cim-subject is deprecated, subjects are now in cim-domain
 
 # Nix-specific dependencies
 tempfile = "3.8"
@@ -79,60 +82,3 @@ tracing-subscriber = "0.3"
 
 [features]
 default = []
-test-utils = []
-integration-tests = []
-
-[[example]]
-name = "create_flake"
-path = "examples/create_flake.rs"
-
-[[example]]
-name = "template_demo"
-path = "examples/template_demo.rs"
-
-[[example]]
-name = "service_demo"
-
-[[example]]
-name = "analyzer_demo"
-path = "examples/analyzer_demo.rs"
-
-[[example]]
-name = "formatter_demo"
-path = "examples/formatter_demo.rs"
-
-[[example]]
-name = "git_integration_demo"
-path = "examples/git_integration_demo.rs"
-
-[[example]]
-name = "nats_subject_demo"
-path = "examples/nats_subject_demo.rs"
-
-[[example]]
-name = "nats_integration_demo"
-path = "examples/nats_integration_demo.rs"
-
-[[example]]
-name = "nats_ecs_demo"
-path = "examples/nats_ecs_demo.rs"
-
-[[example]]
-name = "distributed_ecs_demo"
-path = "examples/distributed_ecs_demo.rs"
-
-[[example]]
-name = "network_integration_demo"
-path = "examples/network_integration_demo.rs"
-
-[[example]]
-name = "starlink_topology_demo"
-path = "examples/starlink_topology_demo.rs"
-
-[[example]]
-name = "simple_topology_demo"
-path = "examples/simple_topology_demo.rs"
-
-[[example]]
-name = "cim_network_starlink_demo"
-path = "examples/cim_network_starlink_demo.rs"

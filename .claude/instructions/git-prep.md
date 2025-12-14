@@ -164,12 +164,6 @@ Add copyright headers to all source files:
   
   ```
 
-- [ ] **Nix files (.nix)**:
-  ```nix
-  # Copyright 2025 Cowboy AI, LLC.
-  
-  ```
-
 ### 7. Dependencies
 
 - [ ] Update dependencies to use GitHub sources where appropriate
