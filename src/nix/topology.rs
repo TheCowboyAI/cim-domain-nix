@@ -13,8 +13,8 @@
 //! ```rust
 //! use cim_domain_nix::nix::topology::*;
 //!
-//! // Parse a topology from a Nix file
-//! let topology = NixTopology::from_file("topology.nix")?;
+//! // Create a new topology
+//! let topology = NixTopology::new("my-infrastructure".to_string());
 //!
 //! // Access nodes and networks
 //! for node in topology.nodes.values() {

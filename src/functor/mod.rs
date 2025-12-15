@@ -47,10 +47,10 @@
 //!
 //! // Map Nix topology to Infrastructure
 //! let topology = NixTopology::new("my-infra".to_string());
-//! let infrastructure = functor.map_topology(&topology)?;
+//! let infrastructure = functor.map_topology(&topology).unwrap();
 //!
 //! // Map back (projection)
-//! let projected_topology = functor.project_topology(&infrastructure)?;
+//! let projected_topology = functor.project_topology(&infrastructure).unwrap();
 //! ```
 
 pub mod mappings;

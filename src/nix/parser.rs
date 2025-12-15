@@ -10,12 +10,9 @@
 //! ```rust
 //! use cim_domain_nix::nix::parser::*;
 //!
-//! // Parse a Nix file
-//! let parser = NixParser::new();
-//! let result = parser.parse_file("config.nix")?;
-//!
 //! // Parse a Nix expression
-//! let result = parser.parse_str("{ x = 1; y = 2; }")?;
+//! let parser = NixParser::new();
+//! let ast = parser.parse_str("{ x = 1; y = 2; }").unwrap();
 //! ```
 
 use super::ast::{AstError, NixAst};

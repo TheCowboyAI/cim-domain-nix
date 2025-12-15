@@ -50,16 +50,14 @@
 //! ```rust
 //! use cim_domain_nix::nix::*;
 //!
-//! // Parse a Nix file
-//! let source = r#"
-//!   { pkgs ? import <nixpkgs> {} }:
-//!   pkgs.hello
-//! "#;
+//! // Parse a Nix expression
+//! let source = "{ x = 1; y = 2; }";
+//! let parser = NixParser::new();
+//! let ast = parser.parse_str(source).unwrap();
 //!
-//! let ast = NixParser::parse(source)?;
-//!
-//! // Access Nix values
-//! let attrset = NixAttrset::from_ast(&ast)?;
+//! // Work with Nix values
+//! let mut attrset = NixAttrset::new();
+//! attrset.insert("name".to_string(), NixValue::String(NixString::new("hello")));
 //! ```
 
 pub mod ast;

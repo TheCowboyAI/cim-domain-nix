@@ -34,6 +34,7 @@
 //!     resource_type: ComputeType::Physical,
 //!     hostname: Hostname::new("server01.example.com").unwrap(),
 //!     system: SystemArchitecture::x86_64_linux(),
+//!     system_description: None,
 //!     capabilities: ResourceCapabilities::new(),
 //! };
 //!
@@ -53,17 +54,13 @@
 //! ```rust
 //! use cim_domain_nix::nix::*;
 //!
-//! // Parse a Nix file
+//! // Parse a Nix string
 //! let parser = NixParser::new();
 //! let ast = parser.parse_str("{ x = 1; y = 2; }").unwrap();
 //!
 //! // Work with Nix values
 //! let mut attrs = NixAttrset::new();
 //! attrs.insert("name".to_string(), NixValue::String(NixString::new("hello")));
-//!
-//! // Parse a flake
-//! let flake_parser = FlakeParser::new();
-//! // let flake = flake_parser.parse("/path/to/flake").unwrap();
 //!
 //! // Parse topology
 //! let topology = NixTopology::new("my-infrastructure".to_string());

@@ -17,7 +17,7 @@
 //! use cim_domain_nix::nix::ast::*;
 //!
 //! let source = "{ x = 1; y = 2; }";
-//! let ast = NixAst::parse(source)?;
+//! let ast = NixAst::parse(source).unwrap();
 //! let root = ast.root();
 //! ```
 
