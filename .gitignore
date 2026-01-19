@@ -49,4 +49,4 @@ examples/output/
 *.log
 
 # Test output
-*.profraw
+*.profrawoutput/

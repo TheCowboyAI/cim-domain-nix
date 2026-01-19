@@ -126,10 +126,12 @@ StorageArray → Device → Appliance ❌
 ## Features
 
 ### Topology Reader (READ Path)
-- **Parse nixos-topology files**: Async file reading with proper error handling
+- **rnix AST parser**: Full Nix syntax parsing with error detection
+- **Async file reading**: Non-blocking I/O with proper error handling
 - **Type detection**: Intelligent parsing of topology node types
 - **Functor integration**: Automatic ResourceType mapping
 - **ComputeResource generation**: Creates domain entities from Nix configuration
+- **Metadata extraction**: Preserves hardware info and custom metadata
 - **Strict and lenient modes**: Choose error handling strategy
 
 ### Topology Writer (WRITE Path)
@@ -271,20 +273,30 @@ cargo run --example functor_demo
 
 # Complete topology generation (homelab example)
 cargo run --example generate_topology
+
+# Roundtrip integration (write → read → verify)
+cargo run --example roundtrip_demo
 ```
 
-**Output from `functor_demo`**:
+**`functor_demo`** - Category Theory Functors:
 - Forward mappings: ResourceType → TopologyNodeType
 - Reverse mappings: TopologyNodeType → ResourceType
 - Many-to-one mapping analysis (20 types → Device)
 - Roundtrip verification (bijective vs lossy)
 - Category theory properties
 
-**Output from `generate_topology`**:
+**`generate_topology`** - Topology Generation:
 - Creates complete nixos-topology configuration
 - 14 nodes total (router, switches, servers, cameras, KVM, monitors)
 - Valid Nix syntax ready for deployment
 - Demonstrates metadata and hardware information
+
+**`roundtrip_demo`** - Full Integration:
+- Creates 4 ComputeResources (router, switch, server, camera)
+- Writes to topology.nix using TopologyWriter
+- Reads back using TopologyReader with rnix parser
+- Verifies all data matches (hostnames, hardware, metadata)
+- Demonstrates complete bidirectional integration
 
 ## Development
 
@@ -321,16 +333,24 @@ cargo test adapters::topology_writer::tests
 # Run examples
 cargo run --example functor_demo
 cargo run --example generate_topology
+cargo run --example roundtrip_demo
 ```
 
 ### Test Coverage
 
-The project includes 22 comprehensive tests:
+The project includes 25 comprehensive tests:
 - ✅ **Functor tests** (7): Type mappings, roundtrips, many-to-one handling
-- ✅ **Reader tests** (6): Parsing, type detection, functor integration
+- ✅ **Reader tests** (9): Parsing, type detection, rnix integration, strict/lenient modes
 - ✅ **Writer tests** (9): Generation, metadata, incremental updates
 
 **All tests passing** ✅
+
+**rnix Parser Tests**:
+- Full AST parsing with error detection
+- Node extraction and attribute parsing
+- Hardware info and metadata extraction
+- Strict mode (rejects unknown types)
+- Lenient mode (maps unknown → Appliance)
 
 ## Status
 
@@ -342,10 +362,12 @@ The project includes 22 comprehensive tests:
 - ✅ **Added nixos-topology integration**: Now in flake.nix inputs
 - ✅ **Fixed dependencies**: `cim-infrastructure` correctly imported
 - ✅ **ResourceType functor**: 35 types → 9 types with roundtrip verification
-- ✅ **Topology reader**: Parse nixos-topology → ComputeResource entities
+- ✅ **rnix AST parser**: Full Nix syntax parsing in TopologyReader
+- ✅ **Topology reader**: Parse nixos-topology → ComputeResource entities (with rnix)
 - ✅ **Topology writer**: Generate nixos-topology from ComputeResource entities
-- ✅ **Working examples**: `functor_demo` and `generate_topology`
-- ✅ **All tests passing**: 22/22 tests ✅
+- ✅ **Roundtrip integration**: Complete write → read → verify pipeline
+- ✅ **Working examples**: `functor_demo`, `generate_topology`, `roundtrip_demo`
+- ✅ **All tests passing**: 25/25 tests ✅
 
 ### Documentation
 - [ARCHITECTURE_CORRECT.md](./ARCHITECTURE_CORRECT.md) - Complete port/adapter architecture guide
@@ -354,18 +376,18 @@ The project includes 22 comprehensive tests:
 ### Next Steps (TODO)
 
 **Immediate**:
-1. **Implement rnix Parser in TopologyReader** - Currently uses placeholder parsing
-2. **Add NATS Projector Service** - Listen to infrastructure events, update topology files
-3. **More Functors** - ComputeResource ⟷ TopologyNode (full entity mapping)
+1. **Add NATS Projector Service** - Listen to infrastructure events, update topology files
+2. **More Functors** - ComputeResource ⟷ TopologyNode (full entity mapping)
+3. **Network and Connection Support** - Extend reader/writer to handle networks/connections
 
 **Short Term**:
-4. **Integration Tests** - Roundtrip tests with real topology files
-5. **Git Integration** - Auto-commit topology changes
-6. **Error Handling** - Custom error types with better context
+4. **Git Integration** - Auto-commit topology changes with proper commit messages
+5. **Error Handling** - Custom error types with better context and recovery
+6. **Advanced rnix Features** - Let bindings, imports, functions
 
 **Medium Term**:
 7. **Performance Optimization** - Streaming parser for large topologies
-8. **Production Hardening** - Rate limiting, circuit breakers
+8. **Production Hardening** - Rate limiting, circuit breakers, retry logic
 9. **CLI Tools** - Standalone topology management commands
 
 ## Documentation

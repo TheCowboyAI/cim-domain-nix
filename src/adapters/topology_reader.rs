@@ -38,10 +38,11 @@
 //! # }
 //! ```
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use cim_infrastructure::{
     ComputeResource, Hostname, ResourceType,
 };
+use rnix::{Root, SyntaxKind, SyntaxNode};
 use std::path::Path;
 use tokio::fs;
 
@@ -155,28 +156,205 @@ impl TopologyReader {
     ///
     /// ## Implementation Notes
     ///
-    /// This is a simplified implementation that demonstrates the concept.
-    /// A full implementation would:
-    /// 1. Use rnix to parse Nix AST
-    /// 2. Walk the topology attribute set
-    /// 3. Extract nodes, networks, connections
-    /// 4. Generate ComputeResource entities
-    ///
-    /// For now, this is a placeholder that shows the interface.
-    fn parse_topology(&self, _content: &str) -> Result<Vec<ComputeResource>> {
-        // TODO: Implement full Nix parsing with rnix
-        //
-        // Steps:
-        // 1. Parse with rnix::Root::parse(content)
-        // 2. Walk AST to find topology nodes
-        // 3. For each node:
-        //    - Extract name, type, system
-        //    - Map type using resource_type_functor
-        //    - Create ComputeResource
-        // 4. Return all discovered resources
+    /// Uses rnix to parse the Nix AST and extract topology nodes.
+    /// Expected structure:
+    /// ```nix
+    /// {
+    ///   nodes = {
+    ///     router01 = {
+    ///       type = "router";
+    ///       hostname = "router01";
+    ///       manufacturer = "Ubiquiti";
+    ///       model = "UniFi Dream Machine Pro";
+    ///       metadata = { ... };
+    ///     };
+    ///   };
+    /// }
+    /// ```
+    fn parse_topology(&self, content: &str) -> Result<Vec<ComputeResource>> {
+        // Parse Nix content with rnix
+        let parsed = Root::parse(content);
 
-        // Placeholder: Return empty vec for now
-        Ok(Vec::new())
+        // Check for parse errors
+        if !parsed.errors().is_empty() {
+            let error_msgs: Vec<String> = parsed
+                .errors()
+                .iter()
+                .map(|e| format!("{:?}", e))
+                .collect();
+            bail!("Nix parse errors: {}", error_msgs.join(", "));
+        }
+
+        let syntax = parsed.syntax();
+
+        // Find the nodes attribute set
+        let nodes_attrset = self.find_nodes_attrset(&syntax)
+            .context("Failed to find 'nodes' attribute set in topology")?;
+
+        // Extract all node entries
+        let mut resources = Vec::new();
+
+        for entry in self.extract_attrset_entries(&nodes_attrset) {
+            match self.parse_node_entry(&entry) {
+                Ok(resource) => resources.push(resource),
+                Err(e) => {
+                    if self.strict_mode {
+                        return Err(e).context("Failed to parse node in strict mode");
+                    } else {
+                        // In lenient mode, log and skip
+                        tracing::warn!("Skipping node due to parse error: {}", e);
+                    }
+                }
+            }
+        }
+
+        Ok(resources)
+    }
+
+    /// Find the 'nodes' attribute set in the topology
+    fn find_nodes_attrset(&self, syntax: &SyntaxNode) -> Result<SyntaxNode> {
+        // Walk the AST to find: { nodes = { ... }; }
+        for child in syntax.descendants() {
+            if child.kind() == SyntaxKind::NODE_ATTR_SET {
+                // Look for an attribute named "nodes"
+                for entry_child in child.children() {
+                    if entry_child.kind() == SyntaxKind::NODE_ATTRPATH_VALUE {
+                        // Check if this is the "nodes" key
+                        if let Some(key_node) = entry_child.first_child() {
+                            let key_text = key_node.text().to_string();
+                            if key_text.trim() == "nodes" {
+                                // Found it! Return the value (the attrset)
+                                if let Some(value) = entry_child.last_child() {
+                                    if value.kind() == SyntaxKind::NODE_ATTR_SET {
+                                        return Ok(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        bail!("Could not find 'nodes' attribute set in topology file")
+    }
+
+    /// Extract all entries from an attribute set
+    fn extract_attrset_entries(&self, attrset: &SyntaxNode) -> Vec<SyntaxNode> {
+        attrset
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::NODE_ATTRPATH_VALUE)
+            .collect()
+    }
+
+    /// Parse a single node entry from the topology
+    fn parse_node_entry(&self, entry: &SyntaxNode) -> Result<ComputeResource> {
+        // Extract node name (key)
+        let node_name = entry
+            .first_child()
+            .context("Node entry missing key")?
+            .text()
+            .to_string()
+            .trim()
+            .to_string();
+
+        // Extract node attributes (value attrset)
+        let node_attrs = entry
+            .last_child()
+            .context("Node entry missing value")?;
+
+        if node_attrs.kind() != SyntaxKind::NODE_ATTR_SET {
+            bail!("Node value is not an attribute set");
+        }
+
+        // Extract required attributes
+        let node_type = self.extract_string_attr(&node_attrs, "type")
+            .context("Missing required 'type' attribute")?;
+
+        // Hostname defaults to node name if not specified
+        let hostname_str = self.extract_string_attr(&node_attrs, "hostname")
+            .unwrap_or_else(|_| node_name.clone());
+
+        // Parse using existing parse_node method
+        let mut resource = self.parse_node(&node_name, &node_type, "x86_64-linux")?;
+
+        // Override hostname if explicitly specified
+        if let Ok(explicit_hostname) = Hostname::new(&hostname_str) {
+            resource.hostname = explicit_hostname;
+        }
+
+        // Extract optional hardware info
+        if let Ok(manufacturer) = self.extract_string_attr(&node_attrs, "manufacturer") {
+            let model = self.extract_string_attr(&node_attrs, "model").ok();
+            let serial = self.extract_string_attr(&node_attrs, "serialNumber").ok();
+            resource.set_hardware(Some(manufacturer), model, serial);
+        }
+
+        // Extract metadata if present
+        if let Ok(metadata_node) = self.find_attr(&node_attrs, "metadata") {
+            if let Some(metadata_attrset) = metadata_node.last_child() {
+                if metadata_attrset.kind() == SyntaxKind::NODE_ATTR_SET {
+                    for meta_entry in self.extract_attrset_entries(&metadata_attrset) {
+                        if let (Ok(key), Ok(value)) = (
+                            self.extract_key(&meta_entry),
+                            self.extract_value_string(&meta_entry),
+                        ) {
+                            let _ = resource.add_metadata(&key, &value);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(resource)
+    }
+
+    /// Find an attribute by name in an attribute set
+    fn find_attr(&self, attrset: &SyntaxNode, name: &str) -> Result<SyntaxNode> {
+        for entry in attrset.children() {
+            if entry.kind() == SyntaxKind::NODE_ATTRPATH_VALUE {
+                if let Some(key) = entry.first_child() {
+                    let key_text = key.text().to_string();
+                    if key_text.trim() == name {
+                        return Ok(entry);
+                    }
+                }
+            }
+        }
+        bail!("Attribute '{}' not found", name)
+    }
+
+    /// Extract a string attribute value
+    fn extract_string_attr(&self, attrset: &SyntaxNode, name: &str) -> Result<String> {
+        let entry = self.find_attr(attrset, name)?;
+        self.extract_value_string(&entry)
+    }
+
+    /// Extract key from a key-value entry
+    fn extract_key(&self, entry: &SyntaxNode) -> Result<String> {
+        Ok(entry
+            .first_child()
+            .context("Missing key")?
+            .text()
+            .to_string()
+            .trim()
+            .to_string())
+    }
+
+    /// Extract string value from a key-value entry
+    fn extract_value_string(&self, entry: &SyntaxNode) -> Result<String> {
+        let value_node = entry.last_child().context("Missing value")?;
+
+        // Handle different value types
+        let text = value_node.text().to_string();
+
+        // Remove quotes if present
+        let trimmed = text.trim();
+        if trimmed.starts_with('"') && trimmed.ends_with('"') {
+            Ok(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Ok(trimmed.to_string())
+        }
     }
 
     /// Parse a topology node and generate ComputeResource
@@ -325,5 +503,99 @@ mod tests {
         let topology_type = reader.parse_topology_type("switch").unwrap();
         let resource_type = map_topology_to_resource_type(topology_type);
         assert_eq!(resource_type, ResourceType::Switch);
+    }
+
+    #[test]
+    fn test_parse_topology_with_rnix() {
+        // Test the full rnix parser integration
+        let reader = TopologyReader::new();
+
+        let nix_content = r#"
+        {
+          nodes = {
+            router01 = {
+              type = "router";
+              hostname = "router01";
+              manufacturer = "Ubiquiti";
+              model = "UniFi Dream Machine Pro";
+            };
+            switch01 = {
+              type = "switch";
+              hostname = "switch01";
+              metadata = {
+                poe_capable = "true";
+                rack = "rack01";
+              };
+            };
+            camera01 = {
+              type = "device";
+              hostname = "camera01";
+            };
+          };
+          networks = { };
+          connections = [ ];
+        }
+        "#;
+
+        let resources = reader.parse_topology(nix_content).unwrap();
+
+        assert_eq!(resources.len(), 3);
+
+        // Find router01
+        let router = resources.iter().find(|r| r.hostname.short_name() == "router01").unwrap();
+        assert_eq!(router.resource_type, ResourceType::Router);
+        assert_eq!(router.manufacturer.as_ref().unwrap(), "Ubiquiti");
+        assert_eq!(router.model.as_ref().unwrap(), "UniFi Dream Machine Pro");
+
+        // Find switch01
+        let switch = resources.iter().find(|r| r.hostname.short_name() == "switch01").unwrap();
+        assert_eq!(switch.resource_type, ResourceType::Switch);
+        assert_eq!(switch.metadata.get("poe_capable").unwrap(), "true");
+        assert_eq!(switch.metadata.get("rack").unwrap(), "rack01");
+
+        // Find camera01
+        let camera = resources.iter().find(|r| r.hostname.short_name() == "camera01").unwrap();
+        assert_eq!(camera.resource_type, ResourceType::Appliance); // Device maps to Appliance
+    }
+
+    #[test]
+    fn test_parse_topology_strict_mode() {
+        // Test strict mode rejects unknown types
+        let reader = TopologyReader::new_strict();
+
+        let nix_content = r#"
+        {
+          nodes = {
+            unknown01 = {
+              type = "totally_unknown_type";
+              hostname = "unknown01";
+            };
+          };
+        }
+        "#;
+
+        let result = reader.parse_topology(nix_content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_topology_lenient_mode() {
+        // Test lenient mode allows unknown types
+        let reader = TopologyReader::new();
+
+        let nix_content = r#"
+        {
+          nodes = {
+            unknown01 = {
+              type = "totally_unknown_type";
+              hostname = "unknown01";
+            };
+          };
+        }
+        "#;
+
+        let resources = reader.parse_topology(nix_content).unwrap();
+        assert_eq!(resources.len(), 1);
+        assert_eq!(resources[0].resource_type, ResourceType::Appliance); // Unknown maps to Appliance
     }
 }
