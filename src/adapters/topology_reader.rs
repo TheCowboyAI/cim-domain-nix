@@ -171,7 +171,7 @@ impl TopologyReader {
     ///   };
     /// }
     /// ```
-    fn parse_topology(&self, content: &str) -> Result<Vec<ComputeResource>> {
+    pub fn parse_topology(&self, content: &str) -> Result<Vec<ComputeResource>> {
         // Parse Nix content with rnix
         let parsed = Root::parse(content);
 
