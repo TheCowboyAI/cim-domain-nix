@@ -41,7 +41,7 @@ tokio-stream = "0.1"
 bytes = "1.5"
 
 # Domain dependencies
-cim-domain-infrastructure = { path = "../cim-domain-infrastructure" }
+cim-infrastructure = { path = "../cim-infrastructure" }
 
 # Temporarily disabled - Will re-enable when we need them for adapters
 # cim-domain = { git = "ssh://git@github.com/TheCowboyAI/cim-domain.git", branch = "main" }

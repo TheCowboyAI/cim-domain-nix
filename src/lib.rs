@@ -145,17 +145,21 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 
-// Phase 1: Infrastructure Domain Core
+// Phase 1: Infrastructure Domain Core (Re-exports from cim-infrastructure)
 pub mod infrastructure;
 
-// Phase 2: Nix Objects Representation
-pub mod nix;
+// Phase 2: Category Theory Functors (Port/Adapter Pattern)
+pub mod functors;
 
-// Phase 3: Category Theory Functor
-pub mod functor;
-
-// Phase 4: Input/Output Adapters
-pub mod io;
+// Phase 3: Adapters (NEW - Port/Adapter for nixos-topology)
+pub mod adapters;
 
 // Re-export for convenience
 pub use infrastructure::*;
+pub use functors::*;
+
+// Note: Old modules moved to src/_deprecated/
+// - functor/ - Built against deprecated infrastructure types
+// - nix/ - Built against deprecated infrastructure types
+// - io/ - Built against deprecated infrastructure types
+// These will be replaced with new clean adapters working with current domain model
